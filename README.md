@@ -25,6 +25,8 @@ python download_frames.py RealEstate10K/ frames/ --split test  --workers 8 --img
 
 Output layout: `frames/{split}/{clip_id}/{timestamp_us}.jpg`.
 
+**Shared subset.** The full RealEstate10K training set is ~72k clips, which is far more data (and disk) than we need. The project fixes a 2,958-clip subset (~6.5 GB) in [`clip_lists/train.txt`](clip_lists/train.txt); `download_frames.py` auto-filters to that list when it exists, so everyone on the team downloads the same clips without any extra flags. To change the subset, regenerate `clip_lists/train.txt` and commit it.
+
 Flags:
 - `--workers N` — parallel `yt-dlp` + `ffmpeg` workers
 - `--limit N` — process only the first N clips (useful for smoke tests)

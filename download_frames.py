@@ -188,6 +188,21 @@ def main() -> None:
     clips = sorted(clip_dir.glob("*.txt"))
     if not clips:
         raise SystemExit(f"No .txt files found in {clip_dir}")
+
+    # Filter to the canonical shared subset if present. Keeps collaborators on
+    # the same clips without any CLI dance.
+    clip_list_path = Path(__file__).parent / "clip_lists" / f"{args.split}.txt"
+    if clip_list_path.exists():
+        wanted = set(clip_list_path.read_text().split())
+        clips = [c for c in clips if c.stem in wanted]
+        missing = wanted - {c.stem for c in clips}
+        if missing:
+            raise SystemExit(
+                f"{len(missing)} clip IDs in {clip_list_path} are not in {clip_dir} "
+                f"(e.g. {sorted(missing)[:3]})."
+            )
+        print(f"Restricted to {len(clips)} clips from {clip_list_path}")
+
     if args.limit:
         clips = clips[: args.limit]
 
