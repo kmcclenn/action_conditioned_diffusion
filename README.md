@@ -56,7 +56,7 @@ batch = next(iter(loader))
 # batch["images"]:  (B, seq_len,   3, H, W)   float32 in [0, 1]
 # batch["K"]:       (B, seq_len,   3, 3)      pixel-coord intrinsics
 # batch["P"]:       (B, seq_len,   3, 4)      camera extrinsics [R|t]
-# batch["actions"]: (B, seq_len-1, 3, 4)      relative pose per step
+# batch["actions"]: (B, seq_len-1, 6)         SE(3) twist (v, omega) per step
 ```
 
 ### Gotchas

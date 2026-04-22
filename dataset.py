@@ -6,7 +6,7 @@ Each clip is a .txt file:
   Lines 1+: timestamp fx fy cx cy | R(3x3) t(3x1)  (row-major, 19 cols total)
 
 Returns sequences of camera intrinsics K (3x3), poses P=[R|t] (3x4),
-and optionally relative poses between consecutive frames as "actions".
+and optionally 6D SE(3) twists (v, omega) between consecutive frames as "actions".
 If frames_root is given and frames exist on disk, also returns image tensors.
 """
 
@@ -86,6 +86,53 @@ def relative_pose(P: torch.Tensor) -> torch.Tensor:
 
     E_rel = E[1:] @ E_inv[:-1]   # (N-1, 4, 4)
     return E_rel[:, :3, :]        # (N-1, 3, 4)
+
+
+def _skew(w: torch.Tensor) -> torch.Tensor:
+    """(..., 3) -> (..., 3, 3) skew-symmetric matrix [w]_x."""
+    zero = torch.zeros_like(w[..., 0])
+    row0 = torch.stack([zero, -w[..., 2],  w[..., 1]], dim=-1)
+    row1 = torch.stack([ w[..., 2], zero, -w[..., 0]], dim=-1)
+    row2 = torch.stack([-w[..., 1],  w[..., 0], zero], dim=-1)
+    return torch.stack([row0, row1, row2], dim=-2)
+
+
+def se3_log(T: torch.Tensor) -> torch.Tensor:
+    """SE(3) log map: (..., 3, 4) or (..., 4, 4) transforms -> (..., 6) twists (v, omega).
+
+    Returns xi = (v, omega) such that exp(xi) = T. Uses Taylor series near theta=0
+    to avoid singularities. Note: pathological at theta = pi (rotation by 180 deg).
+    """
+    if T.shape[-2] == 4:
+        T = T[..., :3, :]
+    R = T[..., :3, :3]
+    t = T[..., :3, 3]
+
+    cos_theta = (R.diagonal(dim1=-2, dim2=-1).sum(-1) - 1.0) * 0.5
+    cos_theta = cos_theta.clamp(-1.0, 1.0)
+    theta = torch.acos(cos_theta)
+    small = theta < 1e-4
+
+    sin_theta = torch.sin(theta)
+    a = torch.where(small, 0.5 + theta**2 / 12.0, theta / (2.0 * sin_theta + 1e-20))
+    skew_R = a[..., None, None] * (R - R.transpose(-1, -2))
+    omega = torch.stack([skew_R[..., 2, 1], skew_R[..., 0, 2], skew_R[..., 1, 0]], dim=-1)
+
+    # V^{-1} = I - (1/2)[w]_x + c2 [w]_x^2, with c2 = (1 - (theta/2) cot(theta/2)) / theta^2
+    th2 = theta / 2.0
+    c2 = torch.where(
+        small,
+        1.0 / 12.0 + theta**2 / 720.0,
+        (1.0 - th2 * torch.cos(th2) / (torch.sin(th2) + 1e-20)) / (theta**2 + 1e-20),
+    )
+
+    W = _skew(omega)
+    W2 = W @ W
+    I3 = torch.eye(3, dtype=T.dtype, device=T.device)
+    V_inv = I3 - 0.5 * W + c2[..., None, None] * W2
+    v = (V_inv @ t.unsqueeze(-1)).squeeze(-1)
+
+    return torch.cat([v, omega], dim=-1)
 
 
 class RealEstate10KDataset(Dataset):
@@ -194,7 +241,7 @@ class RealEstate10KDataset(Dataset):
 
         out: dict = {"timestamps": ts, "K": K, "P": P, "url": clip["url"]}
         if self.return_actions:
-            out["actions"] = relative_pose(P)   # (seq_len-1, 3, 4)
+            out["actions"] = se3_log(relative_pose(P))   # (seq_len-1, 6)
 
         images = self._load_images(clip_id, clip["timestamps"][frame_ids])
         if images is not None:
