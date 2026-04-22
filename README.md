@@ -72,3 +72,74 @@ python dataset.py RealEstate10K/ --split train --seq_len 16 --frames_root frames
 ```
 
 Prints the sample count and the shape/dtype of every tensor in `ds[0]`.
+
+## Inverse dynamics model
+
+`inverse_dynamics.py` trains a supervised model that maps a pair of frames
+`(I_i, I_{i+1})` to the 6D SE(3) twist `a = (v, ω)` between them. See
+[docs/inverse_dynamics.md](docs/inverse_dynamics.md) for the architecture and
+[docs/action_extraction.md](docs/action_extraction.md) for how the target is
+derived from the raw poses.
+
+### Data
+
+Pairs are built by `FramePairDataset`, which walks the same RealEstate10K
+clips that `dataset.py` uses and only keeps consecutive `(i, i+1)` frames
+whose JPEGs both exist at `frames/{split}/{clip_id}/{timestamp_us}.jpg`.
+Actions are precomputed once per clip as `se3_log(relative_pose(P))`.
+
+```python
+from inverse_dynamics import FramePairDataset
+
+ds = FramePairDataset(
+    root="RealEstate10K",
+    frames_root="frames",
+    split="train",
+    img_size=(224, 224),   # matches DINOv2 input
+)
+img_i, img_next, action = ds[0]
+# img_i, img_next: (3, 224, 224) float32 in [0, 1]
+# action:          (6,)          float32  — (v, ω)
+```
+
+### Train
+
+```bash
+python inverse_dynamics.py \
+  --root RealEstate10K \
+  --frames_root frames \
+  --batch_size 64 \
+  --num_epochs 50
+```
+
+What the entry point does:
+1. Builds `FramePairDataset` for `train` and `test`.
+2. Runs `compute_action_stats(train_ds)` over all cached actions (no images
+   loaded) and registers the `(mean, std)` buffers on the model.
+3. Trains with Adam (`lr=1e-4`), linear warmup over 1k steps, grad-clip 1.0,
+   MSE on normalized targets. Best checkpoint saved to
+   `inverse_dynamics.pt`; early-stops after 5 epochs without improvement.
+
+### Inference
+
+```python
+import torch
+from inverse_dynamics import InverseDynamicsModel, preprocess_pair
+
+model = InverseDynamicsModel()
+ckpt = torch.load("inverse_dynamics.pt", map_location="cpu")
+model.load_state_dict(ckpt["model"])
+model.eval()
+
+img_i, img_next = preprocess_pair(img_i, img_next)   # (B,3,224,224)
+action = model.predict(img_i, img_next)              # (B, 6), un-normalized
+```
+
+### Gotchas
+
+- `FramePairDataset` fails loudly if no frame pairs are found on disk —
+  run `download_frames.py` first.
+- The DINOv2 backbone is frozen and stays in `eval()` mode even when the
+  wrapper is set to `train()` (we override `.train()` to enforce this).
+- `preprocess_pair` is a separate function (not inside `forward`) so you
+  can apply pair-consistent augmentations *before* resize+normalize.
