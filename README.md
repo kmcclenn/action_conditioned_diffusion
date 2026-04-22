@@ -1,5 +1,34 @@
 # Action-Conditioned Diffusion
 
+## Environment
+
+The project uses a conda environment defined in [`environment.yml`](environment.yml). Create it once:
+
+```bash
+conda env create -f environment.yml
+conda activate action-diffusion
+```
+
+What's included:
+- `pytorch`, `torchvision` — model + data transforms
+- `numpy`, `scipy` — numerics
+- `pillow` — JPEG I/O used by the frame pipeline
+- `ffmpeg`, `yt-dlp` — external binaries that `download_frames.py` shells out to
+
+Update the env after `environment.yml` changes:
+
+```bash
+conda env update -f environment.yml --prune
+```
+
+Remove it:
+
+```bash
+conda env remove -n action-diffusion
+```
+
+**GPU note.** The default `pytorch` package resolves to a CPU/MPS build on macOS and to a CUDA build on Linux (CUDA runtime bundled). To pin a specific CUDA version on Linux, add e.g. `pytorch-cuda=12.1` alongside `pytorch`.
+
 ## Setup
 
 Download the [RealEstate10K dataset](https://google.github.io/realestate10k/download.html) and place it in the top directory (it will be gitignored). The resulting layout should be:

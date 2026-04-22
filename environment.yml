@@ -1,0 +1,13 @@
+name: action-diffusion
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchvision
+  - numpy
+  - scipy
+  - pillow
+  - ffmpeg
+  - yt-dlp
