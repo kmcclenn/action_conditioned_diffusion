@@ -13,42 +13,48 @@ the learned model.
 
 ## Architecture
 
+Training is split into two stages: a one-time encoder pass that dumps CLS
+tokens to disk (`cache_features.py`), and an MLP head that learns from those
+cached tokens (`inverse_dynamics.py`). At inference, the two stages run
+back-to-back on raw image pairs.
+
 ```
-I_i   ──►┐
-         │   frozen DINOv2           [B, 384]
-         │   ViT-S/14  ─────────►  z_i
-I_{i+1} ─┘                         z_{i+1}
-                                        │
-                                        ▼
-                    concat([ z_i, z_{i+1}, z_{i+1} - z_i ])   [B, 1152]
-                                        │
-                                        ▼
-                             Linear(1152, 512)
-                             LayerNorm + GELU + Dropout(0.1)
-                             Linear(512, 512)
-                             LayerNorm + GELU + Dropout(0.1)
-                             Linear(512, 6)
-                                        │
-                                        ▼
-                              (v, ω)    [B, 6]     (normalized)
+I_i   ──►┐                                                  (cache_features.py)
+         │   frozen DINOv2           [N, 384]
+         │   ViT-S/14  ─────────►  features/{split}/{clip_id}.pt
+I_{i+1} ─┘
+                  │
+                  ▼ load cached pair                       (inverse_dynamics.py)
+              z_i, z_{i+1}    [B, 384] each
+                  │
+                  ▼
+        concat([ z_i, z_{i+1}, z_{i+1} - z_i ])   [B, 1152]
+                  │
+                  ▼
+              Linear(1152, 512)
+              LayerNorm + GELU + Dropout(0.1)
+              Linear(512, 512)
+              LayerNorm + GELU + Dropout(0.1)
+              Linear(512, 6)
+                  │
+                  ▼
+              (v, ω)    [B, 6]     (normalized)
 ```
 
 Parameter counts (ViT-S/14 + head): ~21.7M backbone frozen, ~860K
 trainable in the head.
 
-### Encoder — frozen DINOv2 ViT-S/14
+### Encoder — frozen DINOv2 ViT-S/14 (cached out-of-loop)
 
 - Loaded via `torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")`.
 - Input: ImageNet-normalized `224×224` (divisible by patch size 14).
 - Output: CLS token from `forward_features(x)["x_norm_clstoken"]` with
-  dimension 384.
-- Kept in `eval()` mode and wrapped in `torch.no_grad()` during encoding —
-  no gradient graph is built through the backbone, which cuts activation
-  memory roughly in half.
-- `InverseDynamicsModel.train()` is overridden to recursively set the
-  wrapper's mode but force `self.encoder.eval()`. Without this, a
-  top-level `model.train()` would flip BatchNorm / dropout submodules of
-  the encoder into train mode.
+  dimension 384, saved to `features/{split}/{clip_id}.pt` as fp32.
+- Run once via `cache_features.py`. Because the encoder is frozen and there
+  is no input augmentation, the per-frame feature is deterministic — the
+  cache is canonical, not an approximation.
+- The model class no longer holds the encoder, so there is no need to
+  override `.train()` or wrap forward in `no_grad`.
 
 ### Fusion — concat with difference
 
@@ -74,12 +80,12 @@ We normalize per-dimension:
 
 - `action_mean`, `action_std` are registered as buffers on the model and
   persist in the state dict.
-- `compute_action_stats(train_ds)` uses the fast path on `FramePairDataset`
-  (reads `self._pairs` without loading images) and returns `(mean, std)`
-  of shape `(6,)`.
+- `compute_action_stats(train_ds)` uses the fast path when the source
+  exposes `all_actions()` (as `CachedPairDataset` does) — reads stored
+  targets directly with no I/O — and returns `(mean, std)` of shape `(6,)`.
 - Training minimizes `MSE(pred, normalize_action(target))`.
-- At inference, `model.predict(...)` applies `denormalize_action` so
-  callers see physical units.
+- At inference, callers apply `model.denormalize_action(...)` to map the
+  network output back to physical units.
 
 This matters for optimization (equalizing loss scales across dimensions)
 and for checkpoint portability (stats travel with the weights).
@@ -102,21 +108,25 @@ the first few hundred steps, especially with an occasional outlier action
 near θ ≈ π. Gradient clipping plays the same role as a soft safety net
 rather than a major regularizer.
 
-## Data pipeline — `FramePairDataset`
+## Data pipeline — `CachedPairDataset`
 
-- Reuses `dataset.parse_clip` so the timestamps match what
-  `download_frames.py` writes.
-- Precomputes per-clip `se3_log(relative_pose(P))` up front — one pass
-  over the poses at init, then `__getitem__` only does image I/O.
-- Drops any `(i, i+1)` pair whose two JPEGs aren't both present on disk.
-  This mirrors `frames_only=True` in the sister dataset.
-- Default `img_size=(224, 224)` matches DINOv2's expected input so
-  `preprocess_pair` is a near-no-op.
+- Reuses `dataset.parse_clip` so its pose timestamps line up with the
+  feature timestamps written by `cache_features.py`.
+- At init, walks every clip in the split, loads its `.pt` feature file,
+  and pairs consecutive frames by timestamp. All clips' features are
+  concatenated into a single in-memory tensor (`self._features`); pairs
+  store integer indices into that tensor plus the precomputed action.
+- Drops any `(i, i+1)` pair where either timestamp is missing from the
+  cache. Clips with no `.pt` file at all are skipped silently — re-run
+  `cache_features.py` to fill the gap.
+- `__getitem__` is two index lookups and a stack — no decoding, no I/O,
+  no resize.
 
-The split between dataset (returns raw `[0, 1]` tensors) and
-`preprocess_pair` (does resize + ImageNet normalize) is deliberate: it
-lets you drop pair-consistent augmentations (same crop, same flip) in
-between.
+Why drop the on-the-fly image pipeline: the encoder is frozen and has no
+augmentation, so the per-frame CLS token is fully determined by the
+input frame. Recomputing it every epoch was the bottleneck. With the
+cache, an epoch is dominated by the MLP forward/backward, which fits
+in seconds on MPS or CUDA at the project's clip-list scale.
 
 ## Evaluation
 

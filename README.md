@@ -106,71 +106,75 @@ Prints the sample count and the shape/dtype of every tensor in `ds[0]`.
 
 ## Inverse dynamics model
 
-`inverse_dynamics.py` trains a supervised model that maps a pair of frames
-`(I_i, I_{i+1})` to the 6D SE(3) twist `a = (v, ω)` between them. See
-[docs/inverse_dynamics.md](docs/inverse_dynamics.md) for the architecture and
-[docs/action_extraction.md](docs/action_extraction.md) for how the target is
-derived from the raw poses.
+A supervised model that maps a pair of frames `(I_i, I_{i+1})` to the 6D SE(3)
+twist `a = (v, ω)` between them. Training is split into two stages:
 
-### Data
+1. **`cache_features.py`** — runs frozen DINOv2 ViT-S/14 over every frame once
+   and dumps the CLS tokens to disk.
+2. **`inverse_dynamics.py`** — trains a small MLP head on those cached features.
 
-Pairs are built by `FramePairDataset`, which walks the same RealEstate10K
-clips that `dataset.py` uses and only keeps consecutive `(i, i+1)` frames
-whose JPEGs both exist at `frames/{split}/{clip_id}/{timestamp_us}.jpg`.
-Actions are precomputed once per clip as `se3_log(relative_pose(P))`.
+See [docs/inverse_dynamics.md](docs/inverse_dynamics.md) for the architecture
+and [docs/action_extraction.md](docs/action_extraction.md) for how the target
+is derived from the raw poses.
 
-```python
-from inverse_dynamics import FramePairDataset
+### 1. Cache DINOv2 features
 
-ds = FramePairDataset(
-    root="RealEstate10K",
-    frames_root="frames",
-    split="train",
-    img_size=(224, 224),   # matches DINOv2 input
-)
-img_i, img_next, action = ds[0]
-# img_i, img_next: (3, 224, 224) float32 in [0, 1]
-# action:          (6,)          float32  — (v, ω)
+```bash
+# One-time encoder pass. Resumable — rerun after failures to fill gaps.
+python cache_features.py --frames_root frames --features_root features
 ```
 
-### Train
+Output: `features/{split}/{clip_id}.pt` — a dict with `timestamps` (LongTensor,
+N) and `features` (FloatTensor, N×384). Storage is ~680 MB total at fp32 (~617
+MB train + ~62 MB test).
+
+### 2. Train the head
 
 ```bash
 python inverse_dynamics.py \
   --root RealEstate10K \
-  --frames_root frames \
+  --features_root features \
   --batch_size 64 \
   --num_epochs 50
 ```
 
 What the entry point does:
-1. Builds `FramePairDataset` for `train` and `test`.
-2. Runs `compute_action_stats(train_ds)` over all cached actions (no images
-   loaded) and registers the `(mean, std)` buffers on the model.
+1. Builds `CachedPairDataset` for `train` and `test` — loads all `.pt` files
+   into one in-memory feature tensor and pairs consecutive frames by timestamp.
+2. Runs `compute_action_stats(train_ds)` (reads the stacked actions tensor
+   directly, no I/O) and registers the `(mean, std)` buffers on the model.
 3. Trains with Adam (`lr=1e-4`), linear warmup over 1k steps, grad-clip 1.0,
-   MSE on normalized targets. Best checkpoint saved to
-   `inverse_dynamics.pt`; early-stops after 5 epochs without improvement.
+   MSE on normalized targets. Best checkpoint saved to `inverse_dynamics.pt`;
+   early-stops after 5 epochs without improvement.
+
+Each epoch is well under a minute on MPS or CUDA since the feature encoder is
+out of the loop.
 
 ### Inference
 
 ```python
 import torch
-from inverse_dynamics import InverseDynamicsModel, preprocess_pair
+from inverse_dynamics import InverseDynamicsModel
+from cache_features import load_encoder, PREPROCESS
 
 model = InverseDynamicsModel()
 ckpt = torch.load("inverse_dynamics.pt", map_location="cpu")
 model.load_state_dict(ckpt["model"])
 model.eval()
 
-img_i, img_next = preprocess_pair(img_i, img_next)   # (B,3,224,224)
-action = model.predict(img_i, img_next)              # (B, 6), un-normalized
+# Encode a pair of raw PIL images to CLS features, then run the head.
+encoder = load_encoder(torch.device("cpu"))
+x = torch.stack([PREPROCESS(img_i), PREPROCESS(img_next)]).unsqueeze(0)  # (1,2,3,224,224)
+with torch.no_grad():
+    z = encoder.forward_features(x.view(-1, 3, 224, 224))["x_norm_clstoken"].view(1, 2, -1)
+    action = model.denormalize_action(model(z[:, 0], z[:, 1]))  # (1, 6)
 ```
 
 ### Gotchas
 
-- `FramePairDataset` fails loudly if no frame pairs are found on disk —
-  run `download_frames.py` first.
-- The DINOv2 backbone is frozen and stays in `eval()` mode even when the
-  wrapper is set to `train()` (we override `.train()` to enforce this).
-- `preprocess_pair` is a separate function (not inside `forward`) so you
-  can apply pair-consistent augmentations *before* resize+normalize.
+- `CachedPairDataset` fails loudly if no feature pairs are found on disk —
+  run `cache_features.py` first.
+- `cache_features.py` is resumable by default (skips clips whose `.pt` already
+  exists). Pass `--overwrite` to re-encode.
+- Default `--num_workers 0`: features are already in RAM, so worker processes
+  add no benefit and cost memory via fork duplication.
