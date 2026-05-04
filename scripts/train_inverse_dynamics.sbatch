@@ -3,13 +3,15 @@
 #SBATCH -p mit_normal
 #SBATCH -o logs/inv_dyn_%j.out
 #SBATCH -e logs/inv_dyn_%j.err
-#SBATCH -t 06:00:00
+#SBATCH -t 12:00:00
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 
-set -euo pipefail
+set -eo pipefail
+# `set -u` (nounset) breaks conda's MKL activate hooks, which reference
+# MKL_INTERFACE_LAYER before assigning it. Leave nounset off.
 
 # Run from the repo root regardless of where sbatch is invoked.
 cd "${SLURM_SUBMIT_DIR}"
@@ -30,8 +32,11 @@ conda activate action-diffusion
 # with `wandb sync wandb/offline-run-*`.
 export WANDB_DIR="${SLURM_SUBMIT_DIR}/wandb"
 mkdir -p "${WANDB_DIR}"
-if [[ -z "${WANDB_API_KEY:-}" ]]; then
-    echo "[warn] WANDB_API_KEY not set — running wandb in offline mode."
+# `wandb login` writes credentials to ~/.netrc; that's the preferred path on
+# the cluster (no key in env / shell history). Only fall back to offline if
+# neither WANDB_API_KEY nor a wandb entry in ~/.netrc is available.
+if [[ -z "${WANDB_API_KEY:-}" ]] && ! grep -q "api.wandb.ai" "${HOME}/.netrc" 2>/dev/null; then
+    echo "[warn] no wandb creds (env or ~/.netrc) — running wandb in offline mode."
     export WANDB_MODE=offline
 fi
 
@@ -47,7 +52,9 @@ srun python -u inverse_dynamics.py \
     --features_root features \
     --batch_size    64 \
     --num_workers   "${SLURM_CPUS_PER_TASK}" \
-    --num_epochs    50 \
+    --num_epochs    100 \
+    --ckpt_dir      "checkpoints/inv_dyn_${SLURM_JOB_ID}" \
+    --ckpt_every    10 \
     --wandb \
     --wandb_project action-conditioned-diffusion \
     --wandb_run     "inv_dyn_${SLURM_JOB_ID}"
