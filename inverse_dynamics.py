@@ -111,6 +111,7 @@ class CachedPairDataset(Dataset):
         root: str | Path,
         features_root: str | Path,
         split: str = "train",
+        max_abs_action: float = 0.5,
     ):
         self.root = Path(root)
         self.features_root = Path(features_root)
@@ -125,6 +126,13 @@ class CachedPairDataset(Dataset):
         actions_per_clip: list[torch.Tensor] = []
         pair_idx_chunks:  list[torch.Tensor] = []
 
+        # se3_log is pathological near theta=pi — pairs can produce either
+        # non-finite actions or finite-but-huge outliers (adjacent-frame
+        # rotations > ~20deg are pose-track failures, not real motion). Both
+        # poison action_stats and blow up MSE via Adam's second moment.
+        n_dropped_nonfinite = 0
+        n_dropped_outlier   = 0
+
         # Running row count: lets us rebase per-clip indices into the
         # concatenated self._features tensor we build at the end.
         feature_offset = 0
@@ -136,6 +144,8 @@ class CachedPairDataset(Dataset):
             clip = parse_clip(clip_path)
             poses = torch.from_numpy(clip["P"])              # (N, 3, 4)
             clip_actions = se3_log(relative_pose(poses))     # (N-1, 6)
+            clip_finite  = torch.isfinite(clip_actions).all(dim=-1)       # (N-1,)
+            clip_inlier  = (clip_actions.abs() <= max_abs_action).all(-1) # (N-1,)
             pose_timestamps = [int(t) for t in clip["timestamps"]]
 
             cached = torch.load(feat_path, map_location="cpu", weights_only=True)
@@ -148,6 +158,12 @@ class CachedPairDataset(Dataset):
                 row_i    = ts_to_row.get(pose_timestamps[i])
                 row_next = ts_to_row.get(pose_timestamps[i + 1])
                 if row_i is None or row_next is None:
+                    continue
+                if not clip_finite[i]:
+                    n_dropped_nonfinite += 1
+                    continue
+                if not clip_inlier[i]:
+                    n_dropped_outlier += 1
                     continue
                 valid_pairs.append((feature_offset + row_i, feature_offset + row_next))
                 valid_actions.append(clip_actions[i])
@@ -168,6 +184,10 @@ class CachedPairDataset(Dataset):
         self._features = torch.cat(feats_per_clip,   dim=0)   # (Nframes, 384)
         self._actions  = torch.cat(actions_per_clip, dim=0)   # (Npairs,  6)
         self._pair_idx = torch.cat(pair_idx_chunks,  dim=0)   # (Npairs,  2)
+
+        if n_dropped_nonfinite or n_dropped_outlier:
+            print(f"[{split}] dropped {n_dropped_nonfinite} non-finite + "
+                  f"{n_dropped_outlier} outlier pairs (|a| > {max_abs_action}).")
 
     def __len__(self) -> int:
         return self._pair_idx.shape[0]
@@ -228,17 +248,17 @@ def compute_action_stats(
 @torch.no_grad()
 def evaluate(model: InverseDynamicsModel, loader: DataLoader, device) -> float:
     model.eval()
-    total_sq = 0.0
+    total = 0.0
     n = 0
     for z_i, z_next, action in loader:
-        z_i    = z_i.to(device, non_blocking=True)
-        z_next = z_next.to(device, non_blocking=True)
-        action = action.to(device, non_blocking=True)
+        z_i    = z_i.to(device)
+        z_next = z_next.to(device)
+        action = action.to(device)
         pred   = model(z_i, z_next)
         target = model.normalize_action(action)
-        total_sq += F.mse_loss(pred, target, reduction="sum").item()
+        total += F.smooth_l1_loss(pred, target, reduction="sum").item()
         n += z_i.size(0)
-    return total_sq / max(n * 6, 1)
+    return total / max(n * 6, 1)
 
 
 def train(
@@ -250,7 +270,7 @@ def train(
     warmup_steps: int = 1000,
     grad_clip: float = 1.0,
     device: str | torch.device = "cuda",
-    log_every: int = 100,
+    log_every: int = 1000,
     ckpt_path: str | Path | None = "inverse_dynamics.pt",
     early_stop_patience: int = 5,
 ) -> None:
@@ -268,16 +288,18 @@ def train(
     step = 0
     for epoch in range(num_epochs):
         model.train()
-        run_sq = 0.0
+        run_loss = 0.0
         n = 0
         for z_i, z_next, action in train_loader:
-            z_i    = z_i.to(device, non_blocking=True)
-            z_next = z_next.to(device, non_blocking=True)
-            action = action.to(device, non_blocking=True)
+            # non_blocking=True on MPS with pinned memory silently returns
+            # uninitialized memory for the first batch — keep blocking transfers.
+            z_i    = z_i.to(device)
+            z_next = z_next.to(device)
+            action = action.to(device)
 
             pred   = model(z_i, z_next)
             target = model.normalize_action(action)
-            loss   = F.mse_loss(pred, target)
+            loss   = F.smooth_l1_loss(pred, target)
 
             opt.zero_grad(set_to_none=True)
             loss.backward()
@@ -285,16 +307,16 @@ def train(
             opt.step()
             sched.step()
 
-            run_sq += loss.item() * z_i.size(0)
+            run_loss += loss.item() * z_i.size(0)
             n += z_i.size(0)
             step += 1
             if step % log_every == 0:
                 print(f"epoch {epoch}  step {step}  "
                       f"lr {sched.get_last_lr()[0]:.2e}  "
-                      f"train_mse {loss.item():.4f}")
+                      f"train_loss {loss.item():.4f}")
 
         val = evaluate(model, val_loader, device)
-        print(f"[epoch {epoch}] train_mse {run_sq/max(n,1):.4f}  val_mse {val:.4f}")
+        print(f"[epoch {epoch}] train_loss {run_loss/max(n,1):.4f}  val_loss {val:.4f}")
 
         if val < best_val - 1e-5:
             best_val = val
@@ -303,13 +325,13 @@ def train(
                 torch.save(
                     {"model": model.state_dict(),
                      "epoch": epoch,
-                     "val_mse": best_val},
+                     "val_loss": best_val},
                     ckpt_path,
                 )
         else:
             patience += 1
             if patience >= early_stop_patience:
-                print(f"early stop at epoch {epoch} (best val_mse {best_val:.4f})")
+                print(f"early stop at epoch {epoch} (best val_loss {best_val:.4f})")
                 break
 
 
