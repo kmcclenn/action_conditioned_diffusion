@@ -17,6 +17,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 from torch.utils.data import DataLoader, Dataset
 
 from dataset import parse_clip, relative_pose, se3_log
@@ -273,6 +274,7 @@ def train(
     log_every: int = 1000,
     ckpt_path: str | Path | None = "inverse_dynamics.pt",
     early_stop_patience: int = 5,
+    use_wandb: bool = False,
 ) -> None:
     device = torch.device(device)
     model = model.to(device)
@@ -310,13 +312,26 @@ def train(
             run_loss += loss.item() * z_i.size(0)
             n += z_i.size(0)
             step += 1
+            if use_wandb:
+                wandb.log({
+                    "train/loss_step": loss.item(),
+                    "train/lr": sched.get_last_lr()[0],
+                    "epoch": epoch,
+                }, step=step)
             if step % log_every == 0:
                 print(f"epoch {epoch}  step {step}  "
                       f"lr {sched.get_last_lr()[0]:.2e}  "
                       f"train_loss {loss.item():.4f}")
 
         val = evaluate(model, val_loader, device)
-        print(f"[epoch {epoch}] train_loss {run_loss/max(n,1):.4f}  val_loss {val:.4f}")
+        train_epoch_loss = run_loss / max(n, 1)
+        print(f"[epoch {epoch}] train_loss {train_epoch_loss:.4f}  val_loss {val:.4f}")
+        if use_wandb:
+            wandb.log({
+                "train/loss_epoch": train_epoch_loss,
+                "val/loss": val,
+                "epoch": epoch,
+            }, step=step)
 
         if val < best_val - 1e-5:
             best_val = val
@@ -350,6 +365,10 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs",    type=int, default=50)
     parser.add_argument("--device", default=None,
                         help="torch device. Defaults to cuda > mps > cpu.")
+    parser.add_argument("--wandb",         action="store_true",
+                        help="log train/val loss to Weights & Biases.")
+    parser.add_argument("--wandb_project", default="action-conditioned-diffusion")
+    parser.add_argument("--wandb_run",     default=None)
     args = parser.parse_args()
 
     if args.device is None:
@@ -378,5 +397,25 @@ if __name__ == "__main__":
     print(f"action mean: {mean.tolist()}")
     print(f"action std:  {std.tolist()}")
 
-    train(model, train_loader, val_loader,
-          num_epochs=args.num_epochs, device=args.device)
+    if args.wandb:
+        wandb.init(
+            project=args.wandb_project,
+            name=args.wandb_run,
+            config={
+                "batch_size":  args.batch_size,
+                "num_epochs":  args.num_epochs,
+                "device":      args.device,
+                "train_pairs": len(train_ds),
+                "val_pairs":   len(val_ds),
+                "action_mean": mean.tolist(),
+                "action_std":  std.tolist(),
+            },
+        )
+
+    try:
+        train(model, train_loader, val_loader,
+              num_epochs=args.num_epochs, device=args.device,
+              use_wandb=args.wandb)
+    finally:
+        if args.wandb:
+            wandb.finish()
