@@ -11,3 +11,5 @@ dependencies:
   - pillow
   - ffmpeg
   - yt-dlp
+  - jpeg
+  - libpng
