@@ -17,6 +17,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 from torch.utils.data import DataLoader, Dataset
 
 from dataset import parse_clip, relative_pose, se3_log
@@ -265,17 +266,22 @@ def train(
     model: InverseDynamicsModel,
     train_loader: DataLoader,
     val_loader: DataLoader,
-    num_epochs: int = 50,
+    num_epochs: int = 100,
     lr: float = 1e-4,
     warmup_steps: int = 1000,
     grad_clip: float = 1.0,
     device: str | torch.device = "cuda",
     log_every: int = 1000,
-    ckpt_path: str | Path | None = "inverse_dynamics.pt",
-    early_stop_patience: int = 5,
+    ckpt_dir: str | Path | None = "checkpoints/inverse_dynamics",
+    ckpt_every: int = 10,
+    use_wandb: bool = False,
 ) -> None:
     device = torch.device(device)
     model = model.to(device)
+
+    if ckpt_dir is not None:
+        ckpt_dir = Path(ckpt_dir)
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -284,7 +290,6 @@ def train(
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
 
     best_val = float("inf")
-    patience = 0
     step = 0
     for epoch in range(num_epochs):
         model.train()
@@ -310,29 +315,40 @@ def train(
             run_loss += loss.item() * z_i.size(0)
             n += z_i.size(0)
             step += 1
+            if use_wandb:
+                wandb.log({
+                    "train/loss_step": loss.item(),
+                    "train/lr": sched.get_last_lr()[0],
+                    "epoch": epoch,
+                }, step=step)
             if step % log_every == 0:
                 print(f"epoch {epoch}  step {step}  "
                       f"lr {sched.get_last_lr()[0]:.2e}  "
                       f"train_loss {loss.item():.4f}")
 
         val = evaluate(model, val_loader, device)
-        print(f"[epoch {epoch}] train_loss {run_loss/max(n,1):.4f}  val_loss {val:.4f}")
+        train_epoch_loss = run_loss / max(n, 1)
+        print(f"[epoch {epoch}] train_loss {train_epoch_loss:.4f}  val_loss {val:.4f}")
+        if use_wandb:
+            wandb.log({
+                "train/loss_epoch": train_epoch_loss,
+                "val/loss": val,
+                "epoch": epoch,
+            }, step=step)
 
-        if val < best_val - 1e-5:
-            best_val = val
-            patience = 0
-            if ckpt_path:
-                torch.save(
-                    {"model": model.state_dict(),
-                     "epoch": epoch,
-                     "val_loss": best_val},
-                    ckpt_path,
-                )
-        else:
-            patience += 1
-            if patience >= early_stop_patience:
-                print(f"early stop at epoch {epoch} (best val_loss {best_val:.4f})")
-                break
+        if ckpt_dir is not None:
+            payload = {"model": model.state_dict(), "epoch": epoch, "val_loss": val}
+
+            if val < best_val - 1e-5:
+                best_val = val
+                torch.save({**payload, "val_loss": best_val}, ckpt_dir / "best.pt")
+                print(f"  -> new best val_loss {best_val:.4f} (saved best.pt)")
+
+            # Save every Nth epoch and the final epoch.
+            if (epoch + 1) % ckpt_every == 0 or epoch == num_epochs - 1:
+                ckpt_path = ckpt_dir / f"epoch_{epoch + 1:03d}.pt"
+                torch.save(payload, ckpt_path)
+                print(f"  -> saved {ckpt_path.name}")
 
 
 # --------------------------------------------------------------------------- #
@@ -347,9 +363,17 @@ if __name__ == "__main__":
     parser.add_argument("--features_root", default="features")
     parser.add_argument("--batch_size",    type=int, default=64)
     parser.add_argument("--num_workers",   type=int, default=0)
-    parser.add_argument("--num_epochs",    type=int, default=50)
+    parser.add_argument("--num_epochs",    type=int, default=100)
+    parser.add_argument("--ckpt_dir",      default="checkpoints/inverse_dynamics",
+                        help="directory for best.pt and periodic epoch_NNN.pt files.")
+    parser.add_argument("--ckpt_every",    type=int, default=10,
+                        help="save a snapshot every N epochs (in addition to best.pt).")
     parser.add_argument("--device", default=None,
                         help="torch device. Defaults to cuda > mps > cpu.")
+    parser.add_argument("--wandb",         action="store_true",
+                        help="log train/val loss to Weights & Biases.")
+    parser.add_argument("--wandb_project", default="action-conditioned-diffusion")
+    parser.add_argument("--wandb_run",     default=None)
     args = parser.parse_args()
 
     if args.device is None:
@@ -378,5 +402,26 @@ if __name__ == "__main__":
     print(f"action mean: {mean.tolist()}")
     print(f"action std:  {std.tolist()}")
 
-    train(model, train_loader, val_loader,
-          num_epochs=args.num_epochs, device=args.device)
+    if args.wandb:
+        wandb.init(
+            project=args.wandb_project,
+            name=args.wandb_run,
+            config={
+                "batch_size":  args.batch_size,
+                "num_epochs":  args.num_epochs,
+                "device":      args.device,
+                "train_pairs": len(train_ds),
+                "val_pairs":   len(val_ds),
+                "action_mean": mean.tolist(),
+                "action_std":  std.tolist(),
+            },
+        )
+
+    try:
+        train(model, train_loader, val_loader,
+              num_epochs=args.num_epochs, device=args.device,
+              ckpt_dir=args.ckpt_dir, ckpt_every=args.ckpt_every,
+              use_wandb=args.wandb)
+    finally:
+        if args.wandb:
+            wandb.finish()
