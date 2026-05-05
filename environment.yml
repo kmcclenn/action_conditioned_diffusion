@@ -13,3 +13,5 @@ dependencies:
   - yt-dlp
   - jpeg
   - libpng
+  - wandb
+  - tqdm
