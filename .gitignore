@@ -3,3 +3,5 @@ RealEstate10K/
 __pycache__/
 frames/
 features/
+features_croco/
+checkpoints/

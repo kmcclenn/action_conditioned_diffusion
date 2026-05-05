@@ -262,6 +262,23 @@ def evaluate(model: InverseDynamicsModel, loader: DataLoader, device) -> float:
     return total / max(n * 6, 1)
 
 
+@torch.no_grad()
+def mean_baseline_loss(model: InverseDynamicsModel, loader: DataLoader, device) -> float:
+    """Smooth-L1 loss of the constant predictor (train action mean) on the loader.
+
+    In normalized space this is `smooth_l1_loss(0, normalize_action(action))`.
+    """
+    total = 0.0
+    n = 0
+    for _, _, action in loader:
+        action = action.to(device)
+        target = model.normalize_action(action)
+        pred   = torch.zeros_like(target)
+        total += F.smooth_l1_loss(pred, target, reduction="sum").item()
+        n += action.size(0)
+    return total / max(n * 6, 1)
+
+
 def train(
     model: InverseDynamicsModel,
     train_loader: DataLoader,
@@ -282,6 +299,11 @@ def train(
     if ckpt_dir is not None:
         ckpt_dir = Path(ckpt_dir)
         ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    val_mean_baseline = mean_baseline_loss(model, val_loader, device)
+    print(f"val mean-baseline loss: {val_mean_baseline:.4f}")
+    if use_wandb:
+        wandb.run.summary["val/mean_baseline"] = val_mean_baseline
 
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -333,6 +355,7 @@ def train(
             wandb.log({
                 "train/loss_epoch": train_epoch_loss,
                 "val/loss": val,
+                "val/mean_baseline": val_mean_baseline,
                 "epoch": epoch,
             }, step=step)
 
@@ -406,6 +429,7 @@ if __name__ == "__main__":
         wandb.init(
             project=args.wandb_project,
             name=args.wandb_run,
+            settings=wandb.Settings(init_timeout=300),
             config={
                 "batch_size":  args.batch_size,
                 "num_epochs":  args.num_epochs,
