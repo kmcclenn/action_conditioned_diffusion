@@ -78,6 +78,84 @@ class InverseDynamicsModel(nn.Module):
         return self.head(h)
 
 
+class CrocoMeanPoolIDM(InverseDynamicsModel):
+    """CroCo patch tokens (B, N, 768) -> mean-pooled (B, 768) -> DINOv2-style MLP."""
+
+    def __init__(self, feat_dim: int = 768, dropout: float = 0.1):
+        super().__init__(feat_dim=feat_dim, dropout=dropout)
+
+    def forward(self, z_i: torch.Tensor, z_next: torch.Tensor) -> torch.Tensor:
+        return super().forward(z_i.mean(dim=1), z_next.mean(dim=1))
+
+
+class CrocoTransformerIDM(nn.Module):
+    """Self-attention head over [CLS, f1, f2] for inverse dynamics.
+
+    Inputs are precomputed CroCo patch tokens f1, f2 of shape (B, N, D). A
+    learnable 2D pos-embed is added to each, plus a learnable image-identity
+    embedding (one vector per image), then a learnable CLS is prepended. After
+    `n_blocks` pre-norm transformer blocks, the CLS output predicts the 6D
+    twist via two linear heads (v in R^3, omega in R^3).
+    """
+
+    def __init__(
+        self,
+        feat_dim: int = 768,
+        n_tokens: int = 196,
+        n_heads: int = 12,
+        n_blocks: int = 4,
+        mlp_ratio: float = 4.0,
+        dropout: float = 0.0,
+    ):
+        super().__init__()
+        self.feat_dim = feat_dim
+        self.n_tokens = n_tokens
+
+        self.cls       = nn.Parameter(torch.zeros(1, 1, feat_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, n_tokens, feat_dim))
+        self.img_embed = nn.Parameter(torch.zeros(2, 1, feat_dim))
+        nn.init.trunc_normal_(self.cls,       std=0.02)
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        nn.init.trunc_normal_(self.img_embed, std=0.02)
+
+        block = nn.TransformerEncoderLayer(
+            d_model=feat_dim,
+            nhead=n_heads,
+            dim_feedforward=int(feat_dim * mlp_ratio),
+            dropout=dropout,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
+        self.blocks = nn.TransformerEncoder(block, num_layers=n_blocks)
+
+        self.norm       = nn.LayerNorm(feat_dim)
+        self.v_head     = nn.Linear(feat_dim, 3)
+        self.omega_head = nn.Linear(feat_dim, 3)
+
+        self.register_buffer("action_mean", torch.zeros(6))
+        self.register_buffer("action_std",  torch.ones(6))
+
+    def set_action_stats(self, mean: torch.Tensor, std: torch.Tensor) -> None:
+        self.action_mean.copy_(mean.to(self.action_mean))
+        self.action_std.copy_(std.to(self.action_std).clamp_min(1e-8))
+
+    def normalize_action(self, a: torch.Tensor) -> torch.Tensor:
+        return (a - self.action_mean) / self.action_std
+
+    def denormalize_action(self, a_norm: torch.Tensor) -> torch.Tensor:
+        return a_norm * self.action_std + self.action_mean
+
+    def forward(self, z_i: torch.Tensor, z_next: torch.Tensor) -> torch.Tensor:
+        B = z_i.shape[0]
+        z_i    = z_i    + self.pos_embed + self.img_embed[0:1]
+        z_next = z_next + self.pos_embed + self.img_embed[1:2]
+        x = torch.cat([self.cls.expand(B, -1, -1), z_i, z_next], dim=1)
+        x = self.blocks(x)
+        cls_out = self.norm(x[:, 0])
+        return torch.cat([self.v_head(cls_out), self.omega_head(cls_out)], dim=-1)
+
+
 # --------------------------------------------------------------------------- #
 # Dataset
 # --------------------------------------------------------------------------- #
@@ -92,15 +170,19 @@ class CachedPairDataset(Dataset):
                          "timestamps" (LongTensor, N) and "features" (N, 384)
         Clip .txt     at RealEstate10K/{split}/{clip_id}.txt
 
-    Internally everything is concatenated across clips into three flat
-    tensors so __getitem__ is two index lookups and a no-copy slice:
-        self._features:  (Nframes, 384)  float32  — all clips' CLS tokens
-        self._actions:   (Npairs,  6)    float32  — all valid-pair actions
-        self._pair_idx:  (Npairs,  2)    int64    — (i, next) into _features
+    Per-clip features are kept as mmap-backed tensors (one per clip), so the
+    OS pages in only the rows __getitem__ touches. Resident memory stays
+    proportional to the working set, not the full cache — the previous
+    "concat everything into one tensor" path needed ~135 GB for the CroCo
+    cache (196 x 768 per frame x ~450k frames).
+
+        self._clip_features: list[Tensor]    — feats[c] is (n_frames_c, ...)
+        self._actions:       (Npairs, 6)     float32  — all valid-pair actions
+        self._pair_idx:      (Npairs, 3)     int64    — (clip, row, row_next)
 
     Each __getitem__ returns (z_i, z_next, action):
-        z_i, z_next: (384,) float32
-        action:      (6,)   float32  — se3_log of E_{i+1} @ E_i^{-1}
+        z_i, z_next: feature_shape  float32
+        action:      (6,)            float32  — se3_log of E_{i+1} @ E_i^{-1}
 
     Pose timestamps and feature timestamps are matched by value, not
     position: a pose row is dropped if its timestamp isn't in the cache
@@ -123,7 +205,7 @@ class CachedPairDataset(Dataset):
         if not clip_paths:
             raise FileNotFoundError(f"No .txt files found in {clip_dir}")
 
-        feats_per_clip:   list[torch.Tensor] = []
+        self._clip_features: list[torch.Tensor] = []
         actions_per_clip: list[torch.Tensor] = []
         pair_idx_chunks:  list[torch.Tensor] = []
 
@@ -134,9 +216,6 @@ class CachedPairDataset(Dataset):
         n_dropped_nonfinite = 0
         n_dropped_outlier   = 0
 
-        # Running row count: lets us rebase per-clip indices into the
-        # concatenated self._features tensor we build at the end.
-        feature_offset = 0
         for clip_path in clip_paths:
             feat_path = self.features_root / split / f"{clip_path.stem}.pt"
             if not feat_path.exists():
@@ -149,12 +228,16 @@ class CachedPairDataset(Dataset):
             clip_inlier  = (clip_actions.abs() <= max_abs_action).all(-1) # (N-1,)
             pose_timestamps = [int(t) for t in clip["timestamps"]]
 
-            cached = torch.load(feat_path, map_location="cpu", weights_only=True)
-            feats = cached["features"]                       # already float32
+            # mmap=True keeps `feats` storage backed by the on-disk file —
+            # no full read into RAM at init. Requires PyTorch >= 2.1.
+            cached = torch.load(feat_path, map_location="cpu",
+                                weights_only=True, mmap=True)
+            feats = cached["features"]
             ts_to_row = {int(t): row for row, t in enumerate(cached["timestamps"].tolist())}
 
-            valid_pairs:   list[tuple[int, int]] = []
-            valid_actions: list[torch.Tensor]    = []
+            clip_idx = len(self._clip_features)
+            valid_pairs:   list[tuple[int, int, int]] = []
+            valid_actions: list[torch.Tensor]         = []
             for i in range(len(pose_timestamps) - 1):
                 row_i    = ts_to_row.get(pose_timestamps[i])
                 row_next = ts_to_row.get(pose_timestamps[i + 1])
@@ -166,15 +249,13 @@ class CachedPairDataset(Dataset):
                 if not clip_inlier[i]:
                     n_dropped_outlier += 1
                     continue
-                valid_pairs.append((feature_offset + row_i, feature_offset + row_next))
+                valid_pairs.append((clip_idx, row_i, row_next))
                 valid_actions.append(clip_actions[i])
 
             if valid_pairs:
                 pair_idx_chunks.append(torch.tensor(valid_pairs, dtype=torch.long))
                 actions_per_clip.append(torch.stack(valid_actions))
-
-            feats_per_clip.append(feats)
-            feature_offset += feats.shape[0]
+                self._clip_features.append(feats)
 
         if not pair_idx_chunks:
             raise RuntimeError(
@@ -182,9 +263,8 @@ class CachedPairDataset(Dataset):
                 f"{self.features_root}/{split}/."
             )
 
-        self._features = torch.cat(feats_per_clip,   dim=0)   # (Nframes, 384)
-        self._actions  = torch.cat(actions_per_clip, dim=0)   # (Npairs,  6)
-        self._pair_idx = torch.cat(pair_idx_chunks,  dim=0)   # (Npairs,  2)
+        self._actions  = torch.cat(actions_per_clip, dim=0)   # (Npairs, 6)
+        self._pair_idx = torch.cat(pair_idx_chunks,  dim=0)   # (Npairs, 3)
 
         if n_dropped_nonfinite or n_dropped_outlier:
             print(f"[{split}] dropped {n_dropped_nonfinite} non-finite + "
@@ -194,8 +274,12 @@ class CachedPairDataset(Dataset):
         return self._pair_idx.shape[0]
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        row_i, row_next = self._pair_idx[idx].tolist()
-        return self._features[row_i], self._features[row_next], self._actions[idx]
+        ci, row_i, row_next = self._pair_idx[idx].tolist()
+        feats = self._clip_features[ci]
+        # Clone the slice so the returned tensor doesn't keep the mmap page
+        # pinned beyond the batch — DataLoader workers + pin_memory expect
+        # plain owned CPU tensors.
+        return feats[row_i].clone(), feats[row_next].clone(), self._actions[idx]
 
     def all_actions(self) -> torch.Tensor:
         """(Npairs, 6) tensor of all action targets — fast path for stats."""
@@ -262,6 +346,23 @@ def evaluate(model: InverseDynamicsModel, loader: DataLoader, device) -> float:
     return total / max(n * 6, 1)
 
 
+@torch.no_grad()
+def mean_baseline_loss(model: InverseDynamicsModel, loader: DataLoader, device) -> float:
+    """Smooth-L1 loss of the constant predictor (train action mean) on the loader.
+
+    In normalized space this is `smooth_l1_loss(0, normalize_action(action))`.
+    """
+    total = 0.0
+    n = 0
+    for _, _, action in loader:
+        action = action.to(device)
+        target = model.normalize_action(action)
+        pred   = torch.zeros_like(target)
+        total += F.smooth_l1_loss(pred, target, reduction="sum").item()
+        n += action.size(0)
+    return total / max(n * 6, 1)
+
+
 def train(
     model: InverseDynamicsModel,
     train_loader: DataLoader,
@@ -273,15 +374,34 @@ def train(
     device: str | torch.device = "cuda",
     log_every: int = 1000,
     ckpt_dir: str | Path | None = "checkpoints/inverse_dynamics",
-    ckpt_every: int = 10,
+    ckpt_every: int = 1,
     use_wandb: bool = False,
+    init_from: str | Path | None = None,
 ) -> None:
     device = torch.device(device)
     model = model.to(device)
 
+    start_epoch = 0
+    best_val = float("inf")
+    if init_from is not None:
+        # Warm-start: load weights (and buffers — action stats are buffers) from
+        # a prior best.pt. Optimizer/scheduler state is not stored, so callers
+        # who want to skip warmup should pass warmup_steps=0.
+        ckpt = torch.load(init_from, map_location=device, weights_only=False)
+        model.load_state_dict(ckpt["model"])
+        start_epoch = int(ckpt.get("epoch", -1)) + 1
+        best_val = float(ckpt.get("val_loss", float("inf")))
+        print(f"resumed from {init_from}: start_epoch={start_epoch}  "
+              f"prev_val_loss={best_val:.4f}")
+
     if ckpt_dir is not None:
         ckpt_dir = Path(ckpt_dir)
         ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    val_mean_baseline = mean_baseline_loss(model, val_loader, device)
+    print(f"val mean-baseline loss: {val_mean_baseline:.4f}")
+    if use_wandb:
+        wandb.run.summary["val/mean_baseline"] = val_mean_baseline
 
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -289,9 +409,14 @@ def train(
         return min(1.0, (step + 1) / max(warmup_steps, 1))
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
 
-    best_val = float("inf")
-    step = 0
-    for epoch in range(num_epochs):
+    # Align step with cumulative gradient-step count so wandb fork_from / resume
+    # picks up exactly where the prior run left off. On a resumed wandb run,
+    # also clamp past wandb.run.step (the prior run's max step) so subsequent
+    # logs are strictly increasing.
+    step = start_epoch * len(train_loader)
+    if use_wandb and getattr(wandb.run, "resumed", False):
+        step = max(step, wandb.run.step)
+    for epoch in range(start_epoch, start_epoch + num_epochs):
         model.train()
         run_loss = 0.0
         n = 0
@@ -333,11 +458,13 @@ def train(
             wandb.log({
                 "train/loss_epoch": train_epoch_loss,
                 "val/loss": val,
+                "val/mean_baseline": val_mean_baseline,
                 "epoch": epoch,
             }, step=step)
 
         if ckpt_dir is not None:
-            payload = {"model": model.state_dict(), "epoch": epoch, "val_loss": val}
+            payload = {"model": model.state_dict(), "epoch": epoch,
+                       "step": step, "val_loss": val}
 
             if val < best_val - 1e-5:
                 best_val = val
@@ -345,7 +472,7 @@ def train(
                 print(f"  -> new best val_loss {best_val:.4f} (saved best.pt)")
 
             # Save every Nth epoch and the final epoch.
-            if (epoch + 1) % ckpt_every == 0 or epoch == num_epochs - 1:
+            if (epoch + 1) % ckpt_every == 0 or epoch == start_epoch + num_epochs - 1:
                 ckpt_path = ckpt_dir / f"epoch_{epoch + 1:03d}.pt"
                 torch.save(payload, ckpt_path)
                 print(f"  -> saved {ckpt_path.name}")
@@ -361,19 +488,38 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root",          default="RealEstate10K")
     parser.add_argument("--features_root", default="features")
+    parser.add_argument("--head", choices=["dino_mlp", "croco_meanpool", "croco_transformer"],
+                        default="dino_mlp",
+                        help="dino_mlp: 384-D CLS + MLP. "
+                             "croco_meanpool: mean-pool 196x768 patches + same MLP. "
+                             "croco_transformer: self-attn over [CLS, f1, f2].")
     parser.add_argument("--batch_size",    type=int, default=64)
     parser.add_argument("--num_workers",   type=int, default=0)
     parser.add_argument("--num_epochs",    type=int, default=100)
     parser.add_argument("--ckpt_dir",      default="checkpoints/inverse_dynamics",
                         help="directory for best.pt and periodic epoch_NNN.pt files.")
-    parser.add_argument("--ckpt_every",    type=int, default=10,
+    parser.add_argument("--ckpt_every",    type=int, default=1,
                         help="save a snapshot every N epochs (in addition to best.pt).")
+    parser.add_argument("--init_from",     default=None,
+                        help="path to a prior checkpoint (e.g. best.pt) to warm-start "
+                             "weights from. Optimizer state is not restored.")
+    parser.add_argument("--warmup_steps",  type=int, default=1000,
+                        help="linear LR warmup steps. Pass 0 when --init_from is set "
+                             "to avoid re-warming up an already-trained model.")
     parser.add_argument("--device", default=None,
                         help="torch device. Defaults to cuda > mps > cpu.")
     parser.add_argument("--wandb",         action="store_true",
                         help="log train/val loss to Weights & Biases.")
     parser.add_argument("--wandb_project", default="action-conditioned-diffusion")
     parser.add_argument("--wandb_run",     default=None)
+    parser.add_argument("--wandb_run_id",  default=None,
+                        help="W&B run id to fork from. Combined with the step "
+                             "recorded in --init_from (or --wandb_fork_step), creates "
+                             "a new forked run that branches off cleanly at that step.")
+    parser.add_argument("--wandb_fork_step", type=int, default=None,
+                        help="explicit step to fork from. Required when --init_from "
+                             "points at a checkpoint that does not contain 'step' "
+                             "(e.g. best.pt files saved before this field was added).")
     args = parser.parse_args()
 
     if args.device is None:
@@ -396,17 +542,33 @@ if __name__ == "__main__":
         num_workers=args.num_workers, collate_fn=collate_pairs, pin_memory=True,
     )
 
-    model = InverseDynamicsModel()
+    if args.head == "dino_mlp":
+        model = InverseDynamicsModel()
+    elif args.head == "croco_meanpool":
+        model = CrocoMeanPoolIDM()
+    elif args.head == "croco_transformer":
+        sample_feat = train_ds._clip_features[0][0]
+        model = CrocoTransformerIDM(feat_dim=sample_feat.shape[-1],
+                                    n_tokens=sample_feat.shape[-2])
+    else:
+        raise ValueError(args.head)
     mean, std = compute_action_stats(train_ds)
     model.set_action_stats(mean, std)
     print(f"action mean: {mean.tolist()}")
     print(f"action std:  {std.tolist()}")
 
+    # `fork_from` is gated behind a private preview at W&B, so we use the
+    # public `resume="allow"` path: the new process re-attaches to the existing
+    # run id and appends to it. Step collisions are avoided by clamping the
+    # local step counter to wandb.run.step in train() below. --wandb_fork_step
+    # is accepted for compatibility but unused on this path.
     if args.wandb:
-        wandb.init(
+        init_kwargs = dict(
             project=args.wandb_project,
-            name=args.wandb_run,
+            name=args.wandb_run if args.wandb_run_id is None else None,
+            settings=wandb.Settings(init_timeout=300),
             config={
+                "head":        args.head,
                 "batch_size":  args.batch_size,
                 "num_epochs":  args.num_epochs,
                 "device":      args.device,
@@ -416,11 +578,18 @@ if __name__ == "__main__":
                 "action_std":  std.tolist(),
             },
         )
+        if args.wandb_run_id is not None:
+            init_kwargs["id"] = args.wandb_run_id
+            init_kwargs["resume"] = "allow"
+            print(f"resuming W&B run {args.wandb_run_id} (resume=allow)")
+        wandb.init(**init_kwargs)
 
     try:
         train(model, train_loader, val_loader,
               num_epochs=args.num_epochs, device=args.device,
+              warmup_steps=args.warmup_steps,
               ckpt_dir=args.ckpt_dir, ckpt_every=args.ckpt_every,
+              init_from=args.init_from,
               use_wandb=args.wandb)
     finally:
         if args.wandb:

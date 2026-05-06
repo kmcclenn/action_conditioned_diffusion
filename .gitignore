@@ -5,4 +5,5 @@ frames/
 features/
 logs/
 envs/
+features_croco/
 checkpoints/
