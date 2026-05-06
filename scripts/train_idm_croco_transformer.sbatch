@@ -60,7 +60,35 @@ nvidia-smi || { echo "[error] no GPU visible"; exit 1; }
 
 # Smaller batch than the mean-pool head: transformer attends over
 # (1 + 2*196) = 393 tokens at dim 768, so per-sample memory is ~30x higher.
-srun python -u inverse_dynamics.py \
+# --- optional warm-start ---------------------------------------------------
+# Submit with:
+#   sbatch --export=ALL,RESUME_FROM=checkpoints/idm_croco_tf_<job>/best.pt,\
+#                    FORK_RUN_ID=<old_wandb_run_id>[,FORK_STEP=<step>] \
+#          scripts/train_idm_croco_transformer.sbatch
+# - RESUME_FROM: path to prior checkpoint to warm-start weights from.
+# - FORK_RUN_ID: (optional) old W&B run id to fork from for clean plots.
+#                NOTE: do NOT use WANDB_RUN_ID — wandb reads that as the *new*
+#                run's id and SLURM re-injects it past any local unset.
+# - FORK_STEP:   required only when RESUME_FROM is an old checkpoint that
+#                pre-dates the 'step' field. Compute as
+#                (epoch + 1) * ceil(train_pairs / 32).
+RESUME_ARGS=()
+if [[ -n "${RESUME_FROM:-}" ]]; then
+    echo "resuming from ${RESUME_FROM}"
+    RESUME_ARGS+=(--init_from "${RESUME_FROM}" --warmup_steps 0)
+fi
+# Defensive: if the user passed WANDB_RUN_ID despite the warning, scrub it so
+# wandb auto-generates a fresh id for the forked run.
+unset WANDB_RUN_ID
+if [[ -n "${FORK_RUN_ID:-}" ]]; then
+    echo "forking W&B run ${FORK_RUN_ID}"
+    RESUME_ARGS+=(--wandb_run_id "${FORK_RUN_ID}")
+    if [[ -n "${FORK_STEP:-}" ]]; then
+        RESUME_ARGS+=(--wandb_fork_step "${FORK_STEP}")
+    fi
+fi
+
+srun env -u WANDB_RUN_ID python -u inverse_dynamics.py \
     --root          RealEstate10K \
     --features_root "${FEATURES_ROOT}" \
     --head          croco_transformer \
@@ -69,6 +97,7 @@ srun python -u inverse_dynamics.py \
     --num_epochs    100 \
     --ckpt_dir      "checkpoints/idm_croco_tf_${SLURM_JOB_ID}" \
     --ckpt_every    10 \
+    "${RESUME_ARGS[@]}" \
     --wandb \
     --wandb_project action-conditioned-diffusion \
     --wandb_run     "idm_croco_tf_${SLURM_JOB_ID}"

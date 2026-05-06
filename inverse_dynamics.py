@@ -374,11 +374,25 @@ def train(
     device: str | torch.device = "cuda",
     log_every: int = 1000,
     ckpt_dir: str | Path | None = "checkpoints/inverse_dynamics",
-    ckpt_every: int = 10,
+    ckpt_every: int = 1,
     use_wandb: bool = False,
+    init_from: str | Path | None = None,
 ) -> None:
     device = torch.device(device)
     model = model.to(device)
+
+    start_epoch = 0
+    best_val = float("inf")
+    if init_from is not None:
+        # Warm-start: load weights (and buffers — action stats are buffers) from
+        # a prior best.pt. Optimizer/scheduler state is not stored, so callers
+        # who want to skip warmup should pass warmup_steps=0.
+        ckpt = torch.load(init_from, map_location=device, weights_only=False)
+        model.load_state_dict(ckpt["model"])
+        start_epoch = int(ckpt.get("epoch", -1)) + 1
+        best_val = float(ckpt.get("val_loss", float("inf")))
+        print(f"resumed from {init_from}: start_epoch={start_epoch}  "
+              f"prev_val_loss={best_val:.4f}")
 
     if ckpt_dir is not None:
         ckpt_dir = Path(ckpt_dir)
@@ -395,9 +409,14 @@ def train(
         return min(1.0, (step + 1) / max(warmup_steps, 1))
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
 
-    best_val = float("inf")
-    step = 0
-    for epoch in range(num_epochs):
+    # Align step with cumulative gradient-step count so wandb fork_from / resume
+    # picks up exactly where the prior run left off. On a resumed wandb run,
+    # also clamp past wandb.run.step (the prior run's max step) so subsequent
+    # logs are strictly increasing.
+    step = start_epoch * len(train_loader)
+    if use_wandb and getattr(wandb.run, "resumed", False):
+        step = max(step, wandb.run.step)
+    for epoch in range(start_epoch, start_epoch + num_epochs):
         model.train()
         run_loss = 0.0
         n = 0
@@ -444,7 +463,8 @@ def train(
             }, step=step)
 
         if ckpt_dir is not None:
-            payload = {"model": model.state_dict(), "epoch": epoch, "val_loss": val}
+            payload = {"model": model.state_dict(), "epoch": epoch,
+                       "step": step, "val_loss": val}
 
             if val < best_val - 1e-5:
                 best_val = val
@@ -452,7 +472,7 @@ def train(
                 print(f"  -> new best val_loss {best_val:.4f} (saved best.pt)")
 
             # Save every Nth epoch and the final epoch.
-            if (epoch + 1) % ckpt_every == 0 or epoch == num_epochs - 1:
+            if (epoch + 1) % ckpt_every == 0 or epoch == start_epoch + num_epochs - 1:
                 ckpt_path = ckpt_dir / f"epoch_{epoch + 1:03d}.pt"
                 torch.save(payload, ckpt_path)
                 print(f"  -> saved {ckpt_path.name}")
@@ -478,14 +498,28 @@ if __name__ == "__main__":
     parser.add_argument("--num_epochs",    type=int, default=100)
     parser.add_argument("--ckpt_dir",      default="checkpoints/inverse_dynamics",
                         help="directory for best.pt and periodic epoch_NNN.pt files.")
-    parser.add_argument("--ckpt_every",    type=int, default=10,
+    parser.add_argument("--ckpt_every",    type=int, default=1,
                         help="save a snapshot every N epochs (in addition to best.pt).")
+    parser.add_argument("--init_from",     default=None,
+                        help="path to a prior checkpoint (e.g. best.pt) to warm-start "
+                             "weights from. Optimizer state is not restored.")
+    parser.add_argument("--warmup_steps",  type=int, default=1000,
+                        help="linear LR warmup steps. Pass 0 when --init_from is set "
+                             "to avoid re-warming up an already-trained model.")
     parser.add_argument("--device", default=None,
                         help="torch device. Defaults to cuda > mps > cpu.")
     parser.add_argument("--wandb",         action="store_true",
                         help="log train/val loss to Weights & Biases.")
     parser.add_argument("--wandb_project", default="action-conditioned-diffusion")
     parser.add_argument("--wandb_run",     default=None)
+    parser.add_argument("--wandb_run_id",  default=None,
+                        help="W&B run id to fork from. Combined with the step "
+                             "recorded in --init_from (or --wandb_fork_step), creates "
+                             "a new forked run that branches off cleanly at that step.")
+    parser.add_argument("--wandb_fork_step", type=int, default=None,
+                        help="explicit step to fork from. Required when --init_from "
+                             "points at a checkpoint that does not contain 'step' "
+                             "(e.g. best.pt files saved before this field was added).")
     args = parser.parse_args()
 
     if args.device is None:
@@ -523,10 +557,15 @@ if __name__ == "__main__":
     print(f"action mean: {mean.tolist()}")
     print(f"action std:  {std.tolist()}")
 
+    # `fork_from` is gated behind a private preview at W&B, so we use the
+    # public `resume="allow"` path: the new process re-attaches to the existing
+    # run id and appends to it. Step collisions are avoided by clamping the
+    # local step counter to wandb.run.step in train() below. --wandb_fork_step
+    # is accepted for compatibility but unused on this path.
     if args.wandb:
-        wandb.init(
+        init_kwargs = dict(
             project=args.wandb_project,
-            name=args.wandb_run,
+            name=args.wandb_run if args.wandb_run_id is None else None,
             settings=wandb.Settings(init_timeout=300),
             config={
                 "head":        args.head,
@@ -539,11 +578,18 @@ if __name__ == "__main__":
                 "action_std":  std.tolist(),
             },
         )
+        if args.wandb_run_id is not None:
+            init_kwargs["id"] = args.wandb_run_id
+            init_kwargs["resume"] = "allow"
+            print(f"resuming W&B run {args.wandb_run_id} (resume=allow)")
+        wandb.init(**init_kwargs)
 
     try:
         train(model, train_loader, val_loader,
               num_epochs=args.num_epochs, device=args.device,
+              warmup_steps=args.warmup_steps,
               ckpt_dir=args.ckpt_dir, ckpt_every=args.ckpt_every,
+              init_from=args.init_from,
               use_wandb=args.wandb)
     finally:
         if args.wandb:
