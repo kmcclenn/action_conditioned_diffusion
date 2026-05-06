@@ -50,5 +50,5 @@ srun python -u cache_features.py \
     --encoder       croco \
     --croco_ckpt    "${CKPT}" \
     --frames_root   frames \
-    --features_root features_croco \
+    --features_root /home/kmcclenn/orcd/pool/features_croco \
     --batch_size    64
