@@ -112,10 +112,14 @@ rather than a major regularizer.
 
 - Reuses `dataset.parse_clip` so its pose timestamps line up with the
   feature timestamps written by `cache_features.py`.
-- At init, walks every clip in the split, loads its `.pt` feature file,
-  and pairs consecutive frames by timestamp. All clips' features are
-  concatenated into a single in-memory tensor (`self._features`); pairs
-  store integer indices into that tensor plus the precomputed action.
+- At init, walks every clip in the split, mmap-loads its `.pt` feature
+  file (`torch.load(..., mmap=True)`), and pairs consecutive frames by
+  timestamp. Per-clip tensors are kept in a list (`self._clip_features`)
+  rather than concatenated, so the OS pages in only the rows
+  `__getitem__` touches — resident memory stays in the MB range even for
+  the full ~135 GB CroCo cache.
+- `self._pair_idx[idx]` stores `(clip_idx, row_i_local, row_next_local)`
+  alongside the precomputed action.
 - Drops any `(i, i+1)` pair where either timestamp is missing from the
   cache. Clips with no `.pt` file at all are skipped silently — re-run
   `cache_features.py` to fill the gap.
