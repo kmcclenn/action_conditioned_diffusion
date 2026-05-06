@@ -88,8 +88,10 @@ def _extract_frames(
         )
 
         # showinfo lines: "... n:  42 pts: 12345 pts_time:1.234 ..."
+        # pts_time is relative to the seek point (ffmpeg resets output PTS to
+        # 0 when -ss is given before -i), so shift back to absolute video time.
         pts_times: list[float] = [
-            float(m.group(1))
+            float(m.group(1)) + seek_s
             for line in proc.stderr.splitlines()
             if (m := re.search(r"pts_time:(\S+)", line))
         ]
@@ -102,12 +104,9 @@ def _extract_frames(
 
         # If showinfo count mismatches (rare), fall back to uniform spacing
         if len(pts_times) != len(extracted):
-            if pts_times:
-                interval = (end_s - start_s) / max(len(extracted) - 1, 1)
-                pts_times = [pts_times[0] + i * interval for i in range(len(extracted))]
-            else:
-                interval = (end_s - start_s) / max(len(extracted) - 1, 1)
-                pts_times = [start_s + i * interval for i in range(len(extracted))]
+            interval = (end_s - start_s) / max(len(extracted) - 1, 1)
+            base = pts_times[0] if pts_times else start_s
+            pts_times = [base + i * interval for i in range(len(extracted))]
 
         saved = 0
         for ts_us in timestamps_us:
