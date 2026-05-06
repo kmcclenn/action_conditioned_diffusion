@@ -14,3 +14,4 @@ dependencies:
   - jpeg
   - libpng
   - wandb
+  - tqdm
