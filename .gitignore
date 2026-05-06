@@ -3,3 +3,6 @@ RealEstate10K/
 __pycache__/
 frames/
 features/
+logs/
+envs/
+checkpoints/

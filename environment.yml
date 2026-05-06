@@ -1,11 +1,13 @@
 name: action-diffusion
 channels:
   - pytorch
+  - nvidia
   - conda-forge
 dependencies:
   - python=3.11
-  - pytorch
-  - torchvision
+  - pytorch::pytorch=2.3
+  - pytorch::torchvision=0.18
+  - pytorch::pytorch-cuda=12.1
   - numpy
   - scipy
   - pillow
@@ -13,5 +15,7 @@ dependencies:
   - yt-dlp
   - jpeg
   - libpng
-  - wandb
   - tqdm
+  - pip
+  - pip:
+    - wandb
