@@ -12,6 +12,7 @@ If frames_root is given and frames exist on disk, also returns image tensors.
 
 from __future__ import annotations
 
+import bisect
 import os
 from pathlib import Path
 from typing import Optional
@@ -86,6 +87,46 @@ def relative_pose(P: torch.Tensor) -> torch.Tensor:
 
     E_rel = E[1:] @ E_inv[:-1]   # (N-1, 4, 4)
     return E_rel[:, :3, :]        # (N-1, 3, 4)
+
+
+def snap_to_time_grid(
+    pose_timestamps,
+    feat_timestamps,
+    step_us: int,
+    max_offset_us: int,
+) -> list:
+    """Snap a uniform time grid to the nearest jointly-valid (pose + feature) frame.
+
+    Builds a uniform grid at `step_us` increments, anchored at the earliest
+    timestamp present in BOTH lists and ending at the latest such timestamp.
+    Each grid slot snaps to the nearest jointly-valid frame; slots whose
+    nearest frame is more than `max_offset_us` away become None.
+
+    Returns a list of length floor((last - first) / step_us) + 1. Slot i
+    holds (pose_idx, feat_row) of the snapped frame, or None.
+    """
+    pose_idx = {int(t): i for i, t in enumerate(pose_timestamps)}
+    feat_row = {int(t): r for r, t in enumerate(feat_timestamps)}
+    common = sorted(set(pose_idx) & set(feat_row))
+    if not common:
+        return []
+
+    t0 = common[0]
+    duration_us = common[-1] - t0
+    n = duration_us // step_us + 1
+    grid: list = [None] * n
+    for i in range(n):
+        target = t0 + i * step_us
+        j = bisect.bisect_left(common, target)
+        cands = []
+        if j < len(common):
+            cands.append(common[j])
+        if j > 0:
+            cands.append(common[j - 1])
+        nearest = min(cands, key=lambda t: abs(t - target))
+        if abs(nearest - target) <= max_offset_us:
+            grid[i] = (pose_idx[nearest], feat_row[nearest])
+    return grid
 
 
 def _skew(w: torch.Tensor) -> torch.Tensor:
