@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH -o logs/action_diff_%j.out
 #SBATCH -e logs/action_diff_%j.err
-#SBATCH -t 12:00:00
+#SBATCH -t 6:00:00
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH --cpus-per-task=8
@@ -82,9 +82,9 @@ srun env -u WANDB_RUN_ID python -u action_diffusion.py \
     --batch_size    256 \
     --num_workers   "${SLURM_CPUS_PER_TASK}" \
     --num_epochs    1000 \
-    --ckpt_dir      "checkpoints/action_diff_${HEAD}_${SLURM_JOB_ID}" \
-    --ckpt_every    50 \
+    --ckpt_dir      "checkpoints/action_diff_4hz_${HEAD}_${SLURM_JOB_ID}" \
+    --ckpt_every    10 \
     "${RESUME_ARGS[@]}" \
     --wandb \
-    --wandb_project action-conditioned-diffusion \
-    --wandb_run     "action_diff_${HEAD}_${SLURM_JOB_ID}"
+    --wandb_project action-diffusion-4hz \
+    --wandb_run     "action_diff_4hz_${HEAD}_${SLURM_JOB_ID}"

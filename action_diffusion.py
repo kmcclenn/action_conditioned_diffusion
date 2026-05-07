@@ -867,8 +867,8 @@ if __name__ == "__main__":
                    help="Default: 500 (mlp) / 1000 (transformer).")
     p.add_argument("--grad_clip",    type=float, default=1.0)
 
-    p.add_argument("--ckpt_dir",   default="checkpoints/action_diffusion")
-    p.add_argument("--ckpt_every", type=int, default=50)
+    p.add_argument("--ckpt_dir",   default="checkpoints/action_diffusion_4hz")
+    p.add_argument("--ckpt_every", type=int, default=10)
     p.add_argument("--init_from",  default=None,
                    help="Warm-start weights from a prior best.pt / epoch_NNN.pt.")
 
@@ -888,7 +888,7 @@ if __name__ == "__main__":
     p.add_argument("--device", default=None,
                    help="torch device. Defaults to cuda > mps > cpu.")
     p.add_argument("--wandb",         action="store_true")
-    p.add_argument("--wandb_project", default="action-conditioned-diffusion")
+    p.add_argument("--wandb_project", default="action-diffusion-4hz")
     p.add_argument("--wandb_run",     default=None)
     p.add_argument("--wandb_run_id",  default=None,
                    help="Existing W&B run id to resume.")
