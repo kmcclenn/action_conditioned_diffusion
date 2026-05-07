@@ -1,9 +1,10 @@
 """
-Inverse dynamics head: predict the 6D SE(3) twist a=(v, omega) between two
-consecutive frames from their precomputed DINOv2 CLS features.
+Inverse dynamics head: predict the 6D SE(3) twist a=(v, omega) covering a
+fixed time interval (default: 0.25 s = 1/action_hz at action_hz=4) between
+two frames from their precomputed image features.
 
-  - Input:  z_i, z_{i+1} in R^384 (from cache_features.py)
-  - Fusion: concat([z_i, z_{i+1}, z_{i+1} - z_i])  ->  R^1152
+  - Input:  z_i, z_{i+0.25s} in R^384 (from cache_features.py)
+  - Fusion: concat([z_i, z_next, z_next - z_i])  ->  R^1152
   - MLP:    1152 -> 512 -> 512 -> 6
   - Targets are normalized via (mean, std) buffers on the model
 
@@ -20,7 +21,7 @@ import torch.nn.functional as F
 import wandb
 from torch.utils.data import DataLoader, Dataset
 
-from dataset import parse_clip, relative_pose, se3_log
+from dataset import parse_clip, relative_pose, se3_log, snap_to_time_grid
 
 
 # --------------------------------------------------------------------------- #
@@ -161,7 +162,8 @@ class CrocoTransformerIDM(nn.Module):
 # --------------------------------------------------------------------------- #
 
 class CachedPairDataset(Dataset):
-    """Consecutive-frame pairs served from precomputed DINOv2 CLS features.
+    """Pairs of frames `1/action_hz` seconds apart, served from precomputed
+    image features.
 
     Layout expectations (match cache_features.py + dataset.py):
         root          = RealEstate10K/
@@ -180,13 +182,16 @@ class CachedPairDataset(Dataset):
         self._actions:       (Npairs, 6)     float32  — all valid-pair actions
         self._pair_idx:      (Npairs, 3)     int64    — (clip, row, row_next)
 
+    Pairs are built on a uniform `1/action_hz`-second grid (anchored at the
+    first jointly-valid timestamp), with each grid slot snapped to the
+    nearest jointly-valid frame within half the inter-action interval.
+    Clips shorter than `min_clip_seconds` are dropped to keep the train set
+    aligned with the diffusion-side window length.
+
     Each __getitem__ returns (z_i, z_next, action):
         z_i, z_next: feature_shape  float32
-        action:      (6,)            float32  — se3_log of E_{i+1} @ E_i^{-1}
-
-    Pose timestamps and feature timestamps are matched by value, not
-    position: a pose row is dropped if its timestamp isn't in the cache
-    (e.g. the JPEG failed to download), so the two streams can drift.
+        action:      (6,)            float32  — se3_log of E_{i+1} @ E_i^{-1},
+                                                covering 1/action_hz seconds.
     """
 
     def __init__(
@@ -194,11 +199,18 @@ class CachedPairDataset(Dataset):
         root: str | Path,
         features_root: str | Path,
         split: str = "train",
-        max_abs_action: float = 0.5,
+        action_hz: float = 4.0,
+        min_clip_seconds: float = 2.0,
     ):
         self.root = Path(root)
         self.features_root = Path(features_root)
         self.split = split
+        self.action_hz = action_hz
+        self.min_clip_seconds = min_clip_seconds
+
+        step_us = int(round(1e6 / action_hz))
+        max_offset_us = step_us // 2
+        min_grid_len = int(round(min_clip_seconds * action_hz)) + 1
 
         clip_dir = self.root / split
         clip_paths = sorted(clip_dir.glob("*.txt"))
@@ -209,12 +221,12 @@ class CachedPairDataset(Dataset):
         actions_per_clip: list[torch.Tensor] = []
         pair_idx_chunks:  list[torch.Tensor] = []
 
-        # se3_log is pathological near theta=pi — pairs can produce either
-        # non-finite actions or finite-but-huge outliers (adjacent-frame
-        # rotations > ~20deg are pose-track failures, not real motion). Both
-        # poison action_stats and blow up MSE via Adam's second moment.
+        # se3_log is pathological near theta=pi — pairs can produce non-finite
+        # actions (drop those). The previous |a| <= 0.5 outlier filter is
+        # removed: 1/action_hz-second deltas are larger than inter-frame
+        # deltas and that box would clip real motion.
+        n_dropped_short = 0
         n_dropped_nonfinite = 0
-        n_dropped_outlier   = 0
 
         for clip_path in clip_paths:
             feat_path = self.features_root / split / f"{clip_path.stem}.pt"
@@ -223,34 +235,47 @@ class CachedPairDataset(Dataset):
 
             clip = parse_clip(clip_path)
             poses = torch.from_numpy(clip["P"])              # (N, 3, 4)
-            clip_actions = se3_log(relative_pose(poses))     # (N-1, 6)
-            clip_finite  = torch.isfinite(clip_actions).all(dim=-1)       # (N-1,)
-            clip_inlier  = (clip_actions.abs() <= max_abs_action).all(-1) # (N-1,)
-            pose_timestamps = [int(t) for t in clip["timestamps"]]
+            pose_ts = [int(t) for t in clip["timestamps"]]
 
             # mmap=True keeps `feats` storage backed by the on-disk file —
             # no full read into RAM at init. Requires PyTorch >= 2.1.
             cached = torch.load(feat_path, map_location="cpu",
                                 weights_only=True, mmap=True)
             feats = cached["features"]
-            ts_to_row = {int(t): row for row, t in enumerate(cached["timestamps"].tolist())}
+            feat_ts = cached["timestamps"].tolist()
+
+            grid = snap_to_time_grid(pose_ts, feat_ts, step_us, max_offset_us)
+            if len(grid) < min_grid_len:
+                n_dropped_short += 1
+                continue
 
             clip_idx = len(self._clip_features)
             valid_pairs:   list[tuple[int, int, int]] = []
             valid_actions: list[torch.Tensor]         = []
-            for i in range(len(pose_timestamps) - 1):
-                row_i    = ts_to_row.get(pose_timestamps[i])
-                row_next = ts_to_row.get(pose_timestamps[i + 1])
-                if row_i is None or row_next is None:
+
+            # Walk runs of contiguous non-None grid slots and compute
+            # consecutive deltas in one batched call per run.
+            i = 0
+            while i < len(grid):
+                if grid[i] is None:
+                    i += 1
                     continue
-                if not clip_finite[i]:
-                    n_dropped_nonfinite += 1
-                    continue
-                if not clip_inlier[i]:
-                    n_dropped_outlier += 1
-                    continue
-                valid_pairs.append((clip_idx, row_i, row_next))
-                valid_actions.append(clip_actions[i])
+                j = i
+                while j < len(grid) and grid[j] is not None:
+                    j += 1
+                if j - i >= 2:
+                    pose_indices = [grid[k][0] for k in range(i, j)]
+                    feat_rows    = [grid[k][1] for k in range(i, j)]
+                    rel = relative_pose(poses[pose_indices])      # (M-1, 3, 4)
+                    actions = se3_log(rel)                        # (M-1, 6)
+                    finite = torch.isfinite(actions).all(dim=-1)  # (M-1,)
+                    for m in range(j - i - 1):
+                        if not finite[m]:
+                            n_dropped_nonfinite += 1
+                            continue
+                        valid_pairs.append((clip_idx, feat_rows[m], feat_rows[m + 1]))
+                        valid_actions.append(actions[m])
+                i = j
 
             if valid_pairs:
                 pair_idx_chunks.append(torch.tensor(valid_pairs, dtype=torch.long))
@@ -266,9 +291,10 @@ class CachedPairDataset(Dataset):
         self._actions  = torch.cat(actions_per_clip, dim=0)   # (Npairs, 6)
         self._pair_idx = torch.cat(pair_idx_chunks,  dim=0)   # (Npairs, 3)
 
-        if n_dropped_nonfinite or n_dropped_outlier:
-            print(f"[{split}] dropped {n_dropped_nonfinite} non-finite + "
-                  f"{n_dropped_outlier} outlier pairs (|a| > {max_abs_action}).")
+        print(f"[{split}] {len(self._clip_features)} clips, "
+              f"{self._pair_idx.shape[0]} pairs ({1.0 / action_hz:.3f}s gap; "
+              f"dropped {n_dropped_short} short clips (<{min_clip_seconds}s), "
+              f"{n_dropped_nonfinite} non-finite pairs).")
 
     def __len__(self) -> int:
         return self._pair_idx.shape[0]
@@ -493,6 +519,11 @@ if __name__ == "__main__":
                         help="dino_mlp: 384-D CLS + MLP. "
                              "croco_meanpool: mean-pool 196x768 patches + same MLP. "
                              "croco_transformer: self-attn over [CLS, f1, f2].")
+    parser.add_argument("--action_hz",     type=float, default=4.0,
+                        help="Action rate in Hz. Pairs span 1/action_hz seconds.")
+    parser.add_argument("--min_clip_seconds", type=float, default=2.0,
+                        help="Discard clips shorter than this (matches the "
+                             "diffusion window length).")
     parser.add_argument("--batch_size",    type=int, default=64)
     parser.add_argument("--num_workers",   type=int, default=0)
     parser.add_argument("--num_epochs",    type=int, default=100)
@@ -529,8 +560,12 @@ if __name__ == "__main__":
             else "cpu"
         )
 
-    train_ds = CachedPairDataset(args.root, args.features_root, split="train")
-    val_ds   = CachedPairDataset(args.root, args.features_root, split="test")
+    train_ds = CachedPairDataset(args.root, args.features_root, split="train",
+                                 action_hz=args.action_hz,
+                                 min_clip_seconds=args.min_clip_seconds)
+    val_ds   = CachedPairDataset(args.root, args.features_root, split="test",
+                                 action_hz=args.action_hz,
+                                 min_clip_seconds=args.min_clip_seconds)
     print(f"train pairs: {len(train_ds):,}   test pairs: {len(val_ds):,}")
 
     train_loader = DataLoader(
@@ -568,7 +603,9 @@ if __name__ == "__main__":
             name=args.wandb_run if args.wandb_run_id is None else None,
             settings=wandb.Settings(init_timeout=300),
             config={
-                "head":        args.head,
+                "head":             args.head,
+                "action_hz":        args.action_hz,
+                "min_clip_seconds": args.min_clip_seconds,
                 "batch_size":  args.batch_size,
                 "num_epochs":  args.num_epochs,
                 "device":      args.device,
