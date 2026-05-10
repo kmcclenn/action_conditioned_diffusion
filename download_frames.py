@@ -11,6 +11,11 @@ Output layout:
 Usage:
     python download_frames.py RealEstate10K/ frames/ --split train --workers 8
     python download_frames.py RealEstate10K/ frames/ --split test --limit 100
+
+When YouTube's bot check trips (common from datacenter IPs), pass cookies
+exported from a signed-in browser session:
+    python download_frames.py RealEstate10K/ frames/ --split train \\
+        --workers 4 --cookies cookies.txt --player_client ios
 """
 
 from __future__ import annotations
@@ -26,16 +31,29 @@ from pathlib import Path
 from dataset import parse_clip
 
 
-def _yt_stream_url(youtube_url: str, timeout: int = 30) -> str:
-    """Return the best direct video-stream URL via yt-dlp."""
-    result = subprocess.run(
-        [
-            "yt-dlp", "-g",
-            "--format", "bestvideo[ext=mp4]/best[ext=mp4]/best",
-            youtube_url,
-        ],
-        capture_output=True, text=True, timeout=timeout,
-    )
+def _yt_stream_url(youtube_url: str, timeout: int = 30,
+                   cookies: str | None = None,
+                   player_client: str | None = None) -> str:
+    """Return the best direct video-stream URL via yt-dlp.
+
+    cookies: path to a Netscape-format cookies.txt. Required when YouTube's
+    bot check trips ("Sign in to confirm you're not a bot"), which happens
+    most aggressively from datacenter IPs.
+
+    player_client: forwarded as `--extractor-args youtube:player_client=...`.
+    Useful when the default `web` client is blocked but `ios`/`android` works.
+    """
+    cmd = [
+        "yt-dlp", "-g",
+        "--format", "bestvideo[ext=mp4]/best[ext=mp4]/best",
+    ]
+    if cookies:
+        cmd += ["--cookies", cookies]
+    if player_client:
+        cmd += ["--extractor-args", f"youtube:player_client={player_client}"]
+    cmd.append(youtube_url)
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "yt-dlp returned non-zero")
     # yt-dlp may return two lines (video+audio DASH); take the video line
@@ -125,6 +143,8 @@ def download_clip(
     img_size: tuple[int, int] | None = None,
     quality: int = 2,
     skip_existing: bool = True,
+    cookies: str | None = None,
+    player_client: str | None = None,
 ) -> tuple[str, bool, str]:
     """
     Download all frames for one clip. Safe to call from a subprocess worker.
@@ -145,7 +165,7 @@ def download_clip(
             return clip_id, True, "already complete"
 
     try:
-        url = _yt_stream_url(clip["url"])
+        url = _yt_stream_url(clip["url"], cookies=cookies, player_client=player_client)
     except Exception as exc:
         return clip_id, False, f"yt-dlp: {exc}"
 
@@ -157,8 +177,10 @@ def download_clip(
 
 
 def _worker(args: tuple) -> tuple[str, bool, str]:
-    clip_path, frames_root, img_size, quality, skip_existing = args
-    return download_clip(clip_path, frames_root, img_size, quality, skip_existing)
+    (clip_path, frames_root, img_size, quality, skip_existing,
+     cookies, player_client) = args
+    return download_clip(clip_path, frames_root, img_size, quality,
+                         skip_existing, cookies, player_client)
 
 
 def main() -> None:
@@ -176,7 +198,20 @@ def main() -> None:
                         help="JPEG quality (ffmpeg -q:v, lower=better, 1-31)")
     parser.add_argument("--no_skip",  action="store_true",
                         help="Re-download frames that already exist on disk")
+    parser.add_argument("--cookies", default=None,
+                        help="Path to a Netscape-format cookies.txt for yt-dlp. "
+                             "Required when YouTube's bot check trips (most common "
+                             "from datacenter IPs). Generate locally with "
+                             "`yt-dlp --cookies-from-browser <browser> "
+                             "--cookies cookies.txt --skip-download <any-yt-url>`.")
+    parser.add_argument("--player_client", default=None,
+                        help="yt-dlp youtube extractor player_client override "
+                             "(e.g. 'ios', 'android', 'web_safari'). Try this if "
+                             "cookies alone don't bypass the bot check.")
     args = parser.parse_args()
+
+    if args.cookies and not Path(args.cookies).exists():
+        raise SystemExit(f"--cookies path does not exist: {args.cookies}")
 
     img_size: tuple[int, int] | None = None
     if args.img_size:
@@ -210,7 +245,8 @@ def main() -> None:
 
     print(f"Downloading {len(clips)} clips ({args.split}) → {frames_root}  workers={args.workers}")
 
-    tasks = [(c, frames_root, img_size, args.quality, skip) for c in clips]
+    tasks = [(c, frames_root, img_size, args.quality, skip,
+              args.cookies, args.player_client) for c in clips]
 
     ok = fail = skip_count = 0
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
