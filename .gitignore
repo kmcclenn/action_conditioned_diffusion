@@ -5,3 +5,6 @@ frames/
 features/
 features_croco/
 checkpoints/
+cookies.txt
+eval/
+clip_lists/train_new.txt
