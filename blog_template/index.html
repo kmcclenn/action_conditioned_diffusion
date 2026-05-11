@@ -291,7 +291,9 @@
         <img src="./images/top2.jpg" width="256px" />
         <img src="./images/top3.jpg" width="256px" />
       </div>
-      <div class="margin-right-block">Caption for the image.</div>
+      <div class="margin-right-block">
+        Various frames from the RealEstate10K dataset, showing the beginnings of the house tour clips.
+      </div>
     </div>
 
     <div class="content-margin-container" id="intro">
@@ -325,7 +327,13 @@
         truth start and end image.
       </div>
       <div class="margin-right-block">
-        Margin note that clarifies some detail #main-content-block for intro section.
+        Here, actions are represented as <i>twists</i> where
+        <math display="inline"
+          ><mrow
+            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo><mi>ω</mi><mo stretchy="false">)</mo
+            ><mo>∈</mo><msup><mi>ℝ</mi><mn>6</mn></msup></mrow
+          ></math
+        >.
       </div>
     </div>
 
@@ -335,7 +343,13 @@
         <h1>Background and Related Work</h1>
         <br />
         <b>Diffusion Models.</b> Introduced in results like <a href="ref_5">[5]</a>, a denoising diffusion model
-        iteratively denoises a sample from Gaussian noise. It defines a forward process where a sample
+        iteratively denoises a sample from Gaussian noise to generate samples from the data distribution
+        <math display="inline"
+          ><mrow
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
+            ><mo stretchy="false">)</mo></mrow
+          ></math
+        >. It defines a forward process where a sample
         <math display="inline"
           ><mrow
             ><msup><mi>x</mi><mi>k</mi></msup
@@ -374,10 +388,98 @@
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
             ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo></mrow
           ></math
-        >. By learning this, the model must learn the original data distribution in order to determine how much noise
-        was applied to get a certain sample.
-        <br />
-        <b>Action Diffusion Models.</b>
+        >
+        through the loss function
+        <math display="block" style="margin-top: 1em; margin-bottom: 1em"
+          ><mrow
+            ><mi>ℒ</mi><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo><mo>=</mo
+            ><msub
+              ><mrow
+                ><mo fence="true" lspace="0.2em" rspace="0.2em">‖</mo><msub><mi>ϵ</mi><mi>θ</mi></msub
+                ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+                ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>−</mo><mi>ϵ</mi
+                ><mo fence="true" lspace="0.2em" rspace="0.2em">‖</mo></mrow
+              ><mn>2</mn></msub
+            ></mrow
+          ></math
+        >
+        <div class=""></div>
+        By learning this, the model must learn the original data distribution in order to determine how much noise was
+        applied to get a certain sample. <br /><br />
+        These vanilla diffusion models can generate samples from a given distribution, yet often we want to condition
+        the generation on some prompt. To do this, Classifier-Free Guidance (CFG) <a href="#ref_6">[6]</a> trains both
+        an unconditional model over the distribution
+        <math display="inline"
+          ><mrow
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
+            ><mo stretchy="false">)</mo></mrow
+          ></math
+        >
+        and a conditional model that approximates the distribution
+        <math display="inline"
+          ><mrow
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
+            ><mo>|</mo><mi>c</mi><mo stretchy="false">)</mo></mrow
+          ></math
+        >. Like in standard diffusion, these models are parameterized through the noise function
+        <math display="inline"
+          ><mrow
+            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo stretchy="false">)</mo></mrow
+          ></math
+        >, where the unconditional model simply adds a null token as the conditioning to become
+        <math display="inline"
+          ><mrow
+            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo>=</mo><mi>∅</mi><mo stretchy="false">)</mo></mrow
+          ></math
+        >. On sampling, a guidance scale <math display="inline"><mi>w</mi></math> is introduced so that
+
+        <math display="block" style="margin-top: 1em; margin-bottom: 1em"
+          ><mrow
+            ><msub
+              ><mover><mi>ε</mi><mo>^</mo></mover
+              ><mi>k</mi></msub
+            ><mo>=</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>w</mi><mo stretchy="false">)</mo
+            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo stretchy="false">)</mo><mo>−</mo><mi>w</mi
+            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>.</mo></mrow
+          ></math
+        >
+
+        Thus,
+        <math display="inline"
+          ><mrow><mi>w</mi><mo>=</mo><mn>0</mn></mrow></math
+        >
+        becaomes standard conditioning, and any higher
+        <math display="inline"
+          ><mrow><mi>w</mi><mo>&gt;</mo><mn>0</mn></mrow></math
+        >
+        pushes the sample more in the direction of the conditional distribution.<br /><br />
+        In this paper, we use CFG for both the generation of video frames as well as the generation of action sequences
+        for the downstream navigation task.
+
+        <br /><br />
+        <b>Action Diffusion Models.</b> Following the diffusion model paradigm, <a href="#ref_1">[1]</a> showed that one
+        can iteratively denoise action sequences to ultimately generate a action plan distributed according to some
+        imitation dataset. Concretely, they predict the conditional distribition
+        <math display="inline"
+          ><mrow
+            ><mi>p</mi><mo stretchy="false">(</mo><msub><mi>A</mi><mi>t</mi></msub
+            ><mo>|</mo><msub><mi>O</mi><mi>t</mi></msub
+            ><mo stretchy="false">)</mo></mrow
+          ></math
+        >
+        and use it in a closed loop where they then sample an action chunk, execute part of it, recollect the
+        observation buffer, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
+        generate the entire action sequence at the beginning instead of using the control loop.
         <br />
         <b>Diffusion Forcing Transformer (DFoT).</b>
         <br />
@@ -419,11 +521,12 @@
         <div class="citation" id="references" style="height: auto">
           <br />
           <span style="font-size: 16px">References:</span><br /><br />
-          <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion</a>, FIX<br /><br />
+          <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion policy</a>, FIX<br /><br />
           <a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">ACT</a>, FIX<br /><br />
           <a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">R10K</a>, FIX<br /><br />
           <a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">DFOT</a>, FIX<br /><br />
           <a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2502.06764">Diffusion models</a>, FIX<br /><br />
+          <a id="ref_6"></a>[5] <a href="https://arxiv.org/pdf/2207.12598">CFG</a>, FIX<br /><br />
         </div>
       </div>
       <div class="margin-right-block">
