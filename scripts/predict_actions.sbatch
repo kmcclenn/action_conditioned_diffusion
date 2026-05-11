@@ -20,7 +20,9 @@ module purge
 module load miniforge/24.3.0-0 2>/dev/null || module load anaconda/2023a
 # shellcheck disable=SC1091
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate action-diffusion
+# conda activate action-diffusion
+conda activate ${SLURM_SUBMIT_DIR}/envs/action-diffusion
+
 
 # --- run info --------------------------------------------------------------
 echo "node:        $(hostname)"
