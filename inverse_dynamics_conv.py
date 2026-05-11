@@ -45,16 +45,16 @@ from dataset import parse_clip, relative_pose, se3_log
 # --------------------------------------------------------------------------- #
 
 class ResBlock(nn.Module):
-    """Two 3*3 convs with a residual skip, BN + ReLU."""
+    """Two 3*3 convs with a residual skip, GN + ReLU."""
 
-    def __init__(self, channels: int):
+    def __init__(self, channels: int, num_groups: int = 8):
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(channels),
+            nn.GroupNorm(num_groups, channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(channels),
+            nn.GroupNorm(num_groups, channels),
         )
         self.act = nn.ReLU(inplace=True)
 
@@ -70,17 +70,17 @@ class FrameEncoder(nn.Module):
         hidden: channel width throughout (stem output and residual blocks).
     """
 
-    def __init__(self, hidden: int = 64):
+    def __init__(self, hidden: int = 128, num_groups: int = 8):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv2d(3, hidden, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(hidden),
+            nn.GroupNorm(num_groups, hidden),
             nn.ReLU(inplace=True),
         )
         self.body = nn.Sequential(
-            ResBlock(hidden),
-            ResBlock(hidden),
-            ResBlock(hidden),
+            ResBlock(hidden, num_groups),
+            ResBlock(hidden, num_groups),
+            ResBlock(hidden, num_groups),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -103,7 +103,7 @@ class InverseDynamicsModel(nn.Module):
 
     def __init__(
         self,
-        hidden:  int   = 64,
+        hidden:  int   = 128,
         out_dim: int   = 6,
         dropout: float = 0.1,
     ):
@@ -561,7 +561,7 @@ if __name__ == "__main__":
     parser.add_argument("--root",        default="RealEstate10K",
                         help="Root containing {split}/*.txt.")
     parser.add_argument("--img_size",    type=int, default=224)
-    parser.add_argument("--hidden",      type=int, default=64,
+    parser.add_argument("--hidden",      type=int, default=128,
                         help="Conv encoder channel width.")
     parser.add_argument("--batch_size",  type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=4)

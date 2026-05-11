@@ -22,7 +22,9 @@ module purge
 module load miniforge/24.3.0-0 2>/dev/null || module load anaconda/2023a
 # shellcheck disable=SC1091
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate action-diffusion
+# conda activate action-diffusion
+conda activate ${SLURM_SUBMIT_DIR}/envs/action-diffusion
+
 
 # --- wandb -----------------------------------------------------------------
 export WANDB_DIR="${SLURM_SUBMIT_DIR}/wandb"
@@ -33,7 +35,7 @@ if [[ -z "${WANDB_API_KEY:-}" ]] && ! grep -q "api.wandb.ai" "${HOME}/.netrc" 2>
 fi
 
 # --- preflight -------------------------------------------------------------
-POOL_FEATURES="/home/kmcclenn/orcd/pool/features_croco"
+POOL_FEATURES="/home/nattang/orcd/pool/features_croco"
 if [[ ! -d "${POOL_FEATURES}" ]]; then
     echo "[error] missing CroCo feature cache at ${POOL_FEATURES}"
     echo "        run scripts/cache_features_croco.sbatch first."

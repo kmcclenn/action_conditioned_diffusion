@@ -62,7 +62,6 @@ PREPROCESS = transforms.Compose([
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
 
-
 # Forward functions take a preprocessed batch (B, 3, 224, 224) and return a
 # tensor whose first dim is B. Per-frame shape is encoder-specific:
 #   dinov2 -> (B, 384)

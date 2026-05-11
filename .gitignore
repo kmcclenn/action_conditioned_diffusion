@@ -7,3 +7,5 @@ logs/
 envs/
 features_croco/
 checkpoints/
+wandb/
+wandb_logs/

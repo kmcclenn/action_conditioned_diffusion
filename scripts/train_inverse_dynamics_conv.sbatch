@@ -50,12 +50,12 @@ SCRATCH="/scratch/${USER}/${SLURM_JOB_ID}"
 mkdir -p "${SCRATCH}"
 
 # Copy frames (takes ~1 hour)
-time rsync -av --delete frames/ "${SCRATCH}/frames/" || exit 1
-time rsync -av --delete RealEstate10K/ "${SCRATCH}/RealEstate10K/" || exit 1
+time rsync -a --delete frames/ "${SCRATCH}/frames/" || exit 1
+time rsync -a --delete RealEstate10K/ "${SCRATCH}/RealEstate10K/" || exit 1
 
 echo "Data staged to ${SCRATCH}"
-echo "Local disk speed:"
-time dd if=/dev/zero of="${SCRATCH}/test.tmp" bs=1M count=1000
+# echo "Local disk speed:"
+# time dd if=/dev/zero of="${SCRATCH}/test.tmp" bs=1M count=1000
 
 # --- run -------------------------------------------------------------------
 echo "node:        $(hostname)"
@@ -64,13 +64,15 @@ echo "job id:      ${SLURM_JOB_ID}"
 echo "cpus:        ${SLURM_CPUS_PER_TASK}"
 nvidia-smi 2>/dev/null || echo "(no GPU on this partition)"
 
-srun python -u inverse_dynamics_conv.py \
+    # --root              "${SLURM_SUBMIT_DIR}/RealEstate10K" \
+    # --frames_root       "${SLURM_SUBMIT_DIR}/frames" \
+srun --cpu-bind=none python -u inverse_dynamics_conv.py \
     --root              "${SCRATCH}/RealEstate10K" \
     --frames_root       "${SCRATCH}/frames" \
     --batch_size        64 \
     --num_workers       2 \
     --num_epochs        50 \
-    --img_size          224 \
+    --img_size          256 \
     --hidden            64 \
     --device            cuda \
     --mixed_precision \

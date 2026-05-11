@@ -22,7 +22,8 @@ module purge
 module load miniforge/24.3.0-0 2>/dev/null || module load anaconda/2023a
 # shellcheck disable=SC1091
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate action-diffusion
+# conda activate action-diffusion
+conda activate ${SLURM_SUBMIT_DIR}/envs/action-diffusion
 
 # --- preflight -------------------------------------------------------------
 CKPT="checkpoints/croco/CroCo_V2_ViTBase_SmallDecoder.pth"
@@ -46,9 +47,9 @@ echo "job id:      ${SLURM_JOB_ID}"
 echo "cpus:        ${SLURM_CPUS_PER_TASK}"
 nvidia-smi || { echo "[error] no GPU visible"; exit 1; }
 
-srun python -u cache_features.py \
+srun --cpu-bind=none python -u cache_features.py \
     --encoder       croco \
     --croco_ckpt    "${CKPT}" \
     --frames_root   frames \
-    --features_root /home/kmcclenn/orcd/pool/features_croco \
+    --features_root /home/nattang/orcd/pool/features_croco \
     --batch_size    64
