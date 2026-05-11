@@ -463,7 +463,7 @@
           ><mrow><mi>w</mi><mo>&gt;</mo><mn>0</mn></mrow></math
         >
         pushes the sample more in the direction of the conditional distribution.<br /><br />
-        In this paper, we use CFG for both the generation of video frames as well as the generation of action sequences
+        In this blog, we use CFG for both the generation of video frames as well as the generation of action sequences
         for the downstream navigation task.
 
         <br /><br />
@@ -480,8 +480,14 @@
         and use it in a closed loop where they then sample an action chunk, execute part of it, recollect the
         observation buffer, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
         generate the entire action sequence at the beginning instead of using the control loop.
-        <br />
-        <b>Diffusion Forcing Transformer (DFoT).</b>
+        <br /><br />
+        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video generation originally applied a constant noise
+        level to each frame in the video sequence to then denoise. However, Diffusion Forcing and Diffusion Forcing
+        Transformers <a href="#ref_4">[4]</a> <a href="#ref_7">[7]</a> change this paradigm by applying independently
+        random levels of noise to each frame. This allows us to view the noise as a form of masking and therefore
+        generate multiple types of videos, from interpolating between ground truth frames to generating open-horizon
+        video sequences. This project will use DFoT for video generation conditioned on both the start and end frames
+        (interpolation) and just the start frames to get a possible navigation sequence.
         <br />
         <b>Inverse Dynamic Models.</b>
         <br />
@@ -524,9 +530,10 @@
           <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion policy</a>, FIX<br /><br />
           <a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">ACT</a>, FIX<br /><br />
           <a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">R10K</a>, FIX<br /><br />
-          <a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">DFOT</a>, FIX<br /><br />
+          <a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">Diffusion forcing transformers</a>, FIX<br /><br />
           <a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2502.06764">Diffusion models</a>, FIX<br /><br />
-          <a id="ref_6"></a>[5] <a href="https://arxiv.org/pdf/2207.12598">CFG</a>, FIX<br /><br />
+          <a id="ref_6"></a>[6] <a href="https://arxiv.org/pdf/2207.12598">CFG</a>, FIX<br /><br />
+          <a id="ref_7"></a>[6] <a href="https://arxiv.org/abs/2407.01392">Diffusion forcing</a>, FIX<br /><br />
         </div>
       </div>
       <div class="margin-right-block">
