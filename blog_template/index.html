@@ -1,436 +1,434 @@
 <html>
+  <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 
-<head>
+    <link rel="shortcut icon" href="images/icon.ico" />
+    <style type="text/css">
+      body {
+      	background-color: #f5f9ff;
+      }
 
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+      /* Hide both math displays initially, will display based on JS detection */
+      .mathjax-mobile,
+      .mathml-non-mobile {
+      	display: none;
+      }
 
-	<link rel="shortcut icon" href="images/icon.ico">
-	<style type="text/css">
-		body {
-			background-color: #f5f9ff;
-		}
+      /* Show the MathML content by default on non-mobile devices */
+      .show-mathml .mathml-non-mobile {
+      	display: block;
+      }
 
-		/* Hide both math displays initially, will display based on JS detection */
-		.mathjax-mobile,
-		.mathml-non-mobile {
-			display: none;
-		}
+      .show-mathjax .mathjax-mobile {
+      	display: block;
+      }
 
-		/* Show the MathML content by default on non-mobile devices */
-		.show-mathml .mathml-non-mobile {
-			display: block;
-		}
+      .content-margin-container {
+      	display: flex;
+      	width: 100%;
+      	/* Ensure the container is full width */
+      	justify-content: left;
+      	/* Horizontally centers the children in the container */
+      	align-items: center;
+      	/* Vertically centers the children in the container */
+      }
 
-		.show-mathjax .mathjax-mobile {
-			display: block;
-		}
+      .main-content-block {
+      	width: 70%;
+      	/* Change this percentage as needed */
+      	max-width: 1100px;
+      	/* Optional: Maximum width */
+      	background-color: #fff;
+      	border-left: 1px solid #DDD;
+      	border-right: 1px solid #DDD;
+      	padding: 8px 8px 8px 8px;
+      	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+      	#"Avenir";
+      }
 
-		.content-margin-container {
-			display: flex;
-			width: 100%;
-			/* Ensure the container is full width */
-			justify-content: left;
-			/* Horizontally centers the children in the container */
-			align-items: center;
-			/* Vertically centers the children in the container */
-		}
+      .margin-left-block {
+      	font-size: 14px;
+      	width: 15%;
+      	/* Change this percentage as needed */
+      	max-width: 130px;
+      	/* Optional: Maximum width */
+      	position: relative;
+      	margin-left: 10px;
+      	text-align: left;
+      	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+      	#"Avenir";
+      	padding: 5px;
+      }
 
-		.main-content-block {
-			width: 70%;
-			/* Change this percentage as needed */
-			max-width: 1100px;
-			/* Optional: Maximum width */
-			background-color: #fff;
-			border-left: 1px solid #DDD;
-			border-right: 1px solid #DDD;
-			padding: 8px 8px 8px 8px;
-			font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
-			#"Avenir";
-		}
+      .margin-right-block {
+      	font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+      	#"Avenir";
+      	font-size: 14px;
+      	width: 25%;
+      	/* Change this percentage as needed */
+      	max-width: 256px;
+      	/* Optional: Maximum width */
+      	position: relative;
+      	text-align: left;
+      	padding: 10px;
+      	/* Optional: Adds padding inside the caption */
+      }
 
-		.margin-left-block {
-			font-size: 14px;
-			width: 15%;
-			/* Change this percentage as needed */
-			max-width: 130px;
-			/* Optional: Maximum width */
-			position: relative;
-			margin-left: 10px;
-			text-align: left;
-			font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
-			#"Avenir";
-			padding: 5px;
-		}
+      img {
+      	max-width: 100%;
+      	/* Make sure it fits inside the container */
+      	height: auto;
+      	display: block;
+      	margin: auto;
+      }
 
-		.margin-right-block {
-			font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
-			#"Avenir";
-			font-size: 14px;
-			width: 25%;
-			/* Change this percentage as needed */
-			max-width: 256px;
-			/* Optional: Maximum width */
-			position: relative;
-			text-align: left;
-			padding: 10px;
-			/* Optional: Adds padding inside the caption */
-		}
+      .my-video {
+      	max-width: 100%;
+      	/* Make sure it fits inside the container */
+      	height: auto;
+      	display: block;
+      	margin: auto;
+      }
 
-		img {
-			max-width: 100%;
-			/* Make sure it fits inside the container */
-			height: auto;
-			display: block;
-			margin: auto;
-		}
+      /* Hide both video displays initially, will display based on JS detection */
+      .vid-mobile,
+      .vid-non-mobile {
+      	display: none;
+      }
 
-		.my-video {
-			max-width: 100%;
-			/* Make sure it fits inside the container */
-			height: auto;
-			display: block;
-			margin: auto;
-		}
+      /* Show the video content by default on non-mobile devices */
+      .show-vid-mobile .vid-mobile {
+      	display: block;
+      }
 
-		/* Hide both video displays initially, will display based on JS detection */
-		.vid-mobile,
-		.vid-non-mobile {
-			display: none;
-		}
+      .show-vid-non-mobile .vid-non-mobile {
+      	display: block;
+      }
 
-		/* Show the video content by default on non-mobile devices */
-		.show-vid-mobile .vid-mobile {
-			display: block;
-		}
+      a:link,
+      a:visited {
+      	color: #0e7862;
+      	/*#1367a7;*/
+      	text-decoration: none;
+      }
 
-		.show-vid-non-mobile .vid-non-mobile {
-			display: block;
-		}
+      a:hover {
+      	color: #24b597;
+      	/*#208799;*/
+      }
 
-		a:link,
-		a:visited {
-			color: #0e7862;
-			/*#1367a7;*/
-			text-decoration: none;
-		}
+      h1 {
+      	font-size: 18px;
+      	margin-top: 4px;
+      	margin-bottom: 10px;
+      }
 
-		a:hover {
-			color: #24b597;
-			/*#208799;*/
-		}
+      table.header {
+      	font-weight: 300;
+      	font-size: 17px;
+      	flex-grow: 1;
+      	width: 70%;
+      	max-width: calc(100% - 290px);
+      	/* Adjust according to the width of .paper-code-tab */
+      }
 
-		h1 {
-			font-size: 18px;
-			margin-top: 4px;
-			margin-bottom: 10px;
-		}
+      table td,
+      table td * {
+      	vertical-align: middle;
+      	position: relative;
+      }
 
-		table.header {
-			font-weight: 300;
-			font-size: 17px;
-			flex-grow: 1;
-			width: 70%;
-			max-width: calc(100% - 290px);
-			/* Adjust according to the width of .paper-code-tab */
-		}
+      table.paper-code-tab {
+      	flex-shrink: 0;
+      	margin-left: 8px;
+      	margin-top: 8px;
+      	padding: 0px 0px 0px 8px;
+      	width: 290px;
+      	height: 150px;
+      }
 
-		table td,
-		table td * {
-			vertical-align: middle;
-			position: relative;
-		}
+      .layered-paper {
+      	/* modified from: http://css-tricks.com/snippets/css/layered-paper/ */
+      	box-shadow:
+      		0px 0px 1px 1px rgba(0, 0, 0, 0.35),
+      		/* The top layer shadow */
+      		5px 5px 0 0px #fff,
+      		/* The second layer */
+      		5px 5px 1px 1px rgba(0, 0, 0, 0.35),
+      		/* The second layer shadow */
+      		10px 10px 0 0px #fff,
+      		/* The third layer */
+      		10px 10px 1px 1px rgba(0, 0, 0, 0.35);
+      	/* The third layer shadow */
+      	margin-top: 5px;
+      	margin-left: 10px;
+      	margin-right: 30px;
+      	margin-bottom: 5px;
+      }
 
-		table.paper-code-tab {
-			flex-shrink: 0;
-			margin-left: 8px;
-			margin-top: 8px;
-			padding: 0px 0px 0px 8px;
-			width: 290px;
-			height: 150px;
-		}
+      hr {
+      	height: 1px;
+      	/* Sets the height of the line to 1 pixel */
+      	border: none;
+      	/* Removes the default border */
+      	background-color: #DDD;
+      	/* Sets the line color to black */
+      }
 
-		.layered-paper {
-			/* modified from: http://css-tricks.com/snippets/css/layered-paper/ */
-			box-shadow:
-				0px 0px 1px 1px rgba(0, 0, 0, 0.35),
-				/* The top layer shadow */
-				5px 5px 0 0px #fff,
-				/* The second layer */
-				5px 5px 1px 1px rgba(0, 0, 0, 0.35),
-				/* The second layer shadow */
-				10px 10px 0 0px #fff,
-				/* The third layer */
-				10px 10px 1px 1px rgba(0, 0, 0, 0.35);
-			/* The third layer shadow */
-			margin-top: 5px;
-			margin-left: 10px;
-			margin-right: 30px;
-			margin-bottom: 5px;
-		}
+      div.hypothesis {
+      	width: 80%;
+      	background-color: #EEE;
+      	border: 1px solid black;
+      	border-radius: 10px;
+      	-moz-border-radius: 10px;
+      	-webkit-border-radius: 10px;
+      	font-family: Courier;
+      	font-size: 18px;
+      	text-align: center;
+      	margin: auto;
+      	padding: 16px 16px 16px 16px;
+      }
 
-		hr {
-			height: 1px;
-			/* Sets the height of the line to 1 pixel */
-			border: none;
-			/* Removes the default border */
-			background-color: #DDD;
-			/* Sets the line color to black */
-		}
+      div.citation {
+      	font-size: 0.8em;
+      	background-color: #fff;
+      	padding: 10px;
+      	height: 200px;
+      }
 
-		div.hypothesis {
-			width: 80%;
-			background-color: #EEE;
-			border: 1px solid black;
-			border-radius: 10px;
-			-moz-border-radius: 10px;
-			-webkit-border-radius: 10px;
-			font-family: Courier;
-			font-size: 18px;
-			text-align: center;
-			margin: auto;
-			padding: 16px 16px 16px 16px;
-		}
+      .fade-in-inline {
+      	position: absolute;
+      	text-align: center;
+      	margin: auto;
+      	-webkit-mask-image: linear-gradient(to right,
+      			transparent 0%,
+      			transparent 40%,
+      			black 50%,
+      			black 90%,
+      			transparent 100%);
+      	mask-image: linear-gradient(to right,
+      			transparent 0%,
+      			transparent 40%,
+      			black 50%,
+      			black 90%,
+      			transparent 100%);
+      	-webkit-mask-size: 8000% 100%;
+      	mask-size: 8000% 100%;
+      	animation-name: sweepMask;
+      	animation-duration: 4s;
+      	animation-iteration-count: infinite;
+      	animation-timing-function: linear;
+      	animation-delay: -1s;
+      }
 
-		div.citation {
-			font-size: 0.8em;
-			background-color: #fff;
-			padding: 10px;
-			height: 200px;
-		}
+      .fade-in2-inline {
+      	animation-delay: 1s;
+      }
 
-		.fade-in-inline {
-			position: absolute;
-			text-align: center;
-			margin: auto;
-			-webkit-mask-image: linear-gradient(to right,
-					transparent 0%,
-					transparent 40%,
-					black 50%,
-					black 90%,
-					transparent 100%);
-			mask-image: linear-gradient(to right,
-					transparent 0%,
-					transparent 40%,
-					black 50%,
-					black 90%,
-					transparent 100%);
-			-webkit-mask-size: 8000% 100%;
-			mask-size: 8000% 100%;
-			animation-name: sweepMask;
-			animation-duration: 4s;
-			animation-iteration-count: infinite;
-			animation-timing-function: linear;
-			animation-delay: -1s;
-		}
+      .inline-div {
+      	position: relative;
+      	display: inline-block;
+      	/* Makes both the div and paragraph inline-block elements */
+      	vertical-align: top;
+      	/* Aligns them at the top, you can adjust this to middle, bottom, etc., based on your needs */
+      	width: 50px;
+      	/* Optional: Adds space between the div and the paragraph */
+      }
+    </style>
 
-		.fade-in2-inline {
-			animation-delay: 1s;
-		}
+    <title>Action Diffusion Models</title>
+    <meta property="og:title" content="Action Diffusion Models" />
+    <meta charset="UTF-8" />
+  </head>
 
-		.inline-div {
-			position: relative;
-			display: inline-block;
-			/* Makes both the div and paragraph inline-block elements */
-			vertical-align: top;
-			/* Aligns them at the top, you can adjust this to middle, bottom, etc., based on your needs */
-			width: 50px;
-			/* Optional: Adds space between the div and the paragraph */
-		}
-	</style>
+  <body>
+    <div class="content-margin-container">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <table class="header" align="left">
+          <tr>
+            <td colspan="4">
+              <span
+                style="font-size: 32px; font-family: &quot;Courier New&quot;, Courier, monospace; /* Adds fallbacks */"
+                >Action Diffusion Models on Real Estate House Tours</span
+              >
+            </td>
+          </tr>
+          <tr>
+            <td align="left">
+              <span style="font-size: 17px"><a href="https://www.kaimcclennen.com/">Kai McClennen</a></span>
+            </td>
+            <td align="left">
+              <span style="font-size: 17px"><a href="https://www.linkedin.com/in/natalietang04/">Natalie Tang</a></span>
+            </td>
+            <td align="left">
+              <span style="font-size: 17px"><a href="https://www.linkedin.com/in/abraham-krebs/">AZ Krebs</a></span>
+            </td>
+          </tr>
 
-	<title>Action Diffusion Models</title>
-	<meta property="og:title" content="Action Diffusion Models" />
-	<meta charset="UTF-8">
-</head>
+          <tr>
+            <td colspan="4" align="left"><span style="font-size: 18px">Final project for 6.8300, MIT</span></td>
+          </tr>
+        </table>
+      </div>
+      <div class="margin-right-block"></div>
+    </div>
 
-<body>
+    <div class="content-margin-container" id="intro">
+      <div class="margin-left-block">
+        <!-- table of contents here -->
+        <div style="position: fixed; max-width: inherit; top: max(20%, 120px)">
+          <b style="font-size: 16px">Outline</b><br /><br />
+          <a href="#intro">Introduction</a><br /><br />
+          <a href="#background">Background/related work</a><br /><br />
+          <a href="#implications_and_limitations">Methods, figures showing method</a><br /><br />
+          <a href="#implications_and_limitations">Experiments/results</a><br /><br />
+          <a href="#implications_and_limitations">Conclusion/discussion</a><br /><br />
+        </div>
+      </div>
+      <div class="main-content-block" style="display: flex; gap: 10px">
+        <img src="./images/top1.jpg" width="256px" />
+        <img src="./images/top2.jpg" width="256px" />
+        <img src="./images/top3.jpg" width="256px" />
+      </div>
+      <div class="margin-right-block">Caption for the image.</div>
+    </div>
 
-	<div class="content-margin-container">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<table class="header" align=left>
-				<tr>
-					<td colspan=4>
-						<span
-							style="font-size: 32px; font-family: 'Courier New', Courier, monospace; /* Adds fallbacks */">Action
-							Diffusion Models on Real Estate House Tours</span>
-					</td>
-				</tr>
-				<tr>
-					<td align=left>
-						<span style="font-size:17px"><a href="https://www.kaimcclennen.com/">Kai McClennen</a></span>
-					</td>
-					<td align=left>
-						<span style="font-size:17px"><a href="https://www.linkedin.com/in/natalietang04/">Natalie
-								Tang</a></span>
-					</td>
-					<td align=left>
-						<span style="font-size:17px"><a href="https://www.linkedin.com/in/abraham-krebs/">AZ
-								Krebs</a></span>
-					</td>
-				<tr>
-					<td colspan=4 align=left><span style="font-size:18px">Final project for 6.8300, MIT</span></td>
-				</tr>
-			</table>
-		</div>
-		<div class="margin-right-block">
-		</div>
-	</div>
+    <div class="content-margin-container" id="intro">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <h1>Introduction</h1>
+        Humans are used to seeing the world through an ego-centric view; we can make all the decision and plans we need
+        from the visual stimulus of our eyes alone. When placed in a room, a human can instantly determine a trajectory
+        to the desired goal location. This ego-centric navigation planning for computers, on the other hand, is a
+        difficult task; many modern action planning results rely on top or side view cameras <a href="#ref_1">[1]</a>
+        <a href="#ref_2">[2]</a>. Thus, we want to see if we could generate action sequences to a goal position given
+        only start and finish images.<br /><br />
+        Concretely, we train a conditional action-diffusion model on the RealEstate10K dataset <a href="#ref_3">[3]</a>,
+        a collection of ego-view house tour clips. Given the (embeddings of) start and goal images from a certain clip,
+        we diffuse action sequences of variable lengths (FIX - IS TS TRUE) at a 4 Hz frequency. We compare this model
+        with a baseline diffusion forcing transformer <a href="#ref_4">[4]</a>
+        that infers an interpolated sequence of frames in between the start and goal frame. Given this inferred
+        sequence, we run an inverse diffusion model on consecutive frames to generate the action sequence. We thus ask
+        the question:
+        <i>can a action-only diffusion model outperform a video-diffusion model for a navigation task?</i><br /><br />
 
-	<div class="content-margin-container" id="intro">
-		<div class="margin-left-block">
-			<!-- table of contents here -->
-			<div style="position:fixed; max-width:inherit; top:max(20%,120px)">
-				<b style="font-size:16px">Outline</b><br><br>
-				<a href="#intro">Introduction</a><br><br>
-				<a href="#background">Background/related work</a><br><br>
-				<a href="#implications_and_limitations">Methods, figures showing method</a><br><br>
-				<a href="#implications_and_limitations">Experiments/results</a><br><br>
-				<a href="#implications_and_limitations">Conclusion/discussion</a><br><br>
-			</div>
-		</div>
-		<div class="main-content-block" style="display: flex; gap: 10px;">
-			<img src="./images/top1.jpg" width="256px" />
-			<img src="./images/top2.jpg" width="256px" />
-			<img src="./images/top3.jpg" width="256px" />
-		</div>
-		<div class="margin-right-block">
-			Caption for the image.
-		</div>
-	</div>
+        Both models use the diffusion paradigm to generate an action sequence sampled from the distribution of possible
+        paths from the start to finish, a necessary task given that there is never one unique action sequence from point
+        A to point B. Instead, we want to sample from the distribution of all possible action sequences. However, by
+        directly generating action sequences, we hypothesize that the generative model can decouple the action dynamics
+        from the image generation, leading to more consistent and executable trajectories. In contrast, we wonder if the
+        video generative model could generate visually plausable but dynamically infeasible trajectories.<br /><br />
+        This project targets a specific gap in the literature. Diffusion Policy <a href="#ref_1">[1]</a> uses a control
+        loop to iteratively diffuse action chunks. Existing inverse dynamics models can also infer action deltas between
+        consecutive frames. However, we ask the specific question about interpolating action sequences given a ground
+        truth start and end image.
+      </div>
+      <div class="margin-right-block">
+        Margin note that clarifies some detail #main-content-block for intro section.
+      </div>
+    </div>
 
-	<div class="content-margin-container" id="intro">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<h1>Introduction</h1>
-			Humans are used to seeing the world through an ego-centric view; we can make all the decision and plans
-			we need from the visual stimulus of our eyes alone. When placed in a room, a human can instantly determine a
-			trajectory to the desired goal location. This ego-centric navigation planning for computers, on
-			the other hand, is a difficult
-			task; many modern action planning results rely on top or side view cameras <a href="#ref_1">[1]</a> <a
-				href="#ref_2">[2]</a>. Thus, we want to see if we could generate action sequences to a goal position
-			given only start and finish images.<br><br>
-			Concretely, we train a conditional action-diffusion model on the RealEstate10K dataset <a
-				href="#ref_3">[3]</a>, a collection of ego-view house tour clips. Given the (embeddings of) start and
-			goal images from a certain clip, we diffuse action sequences of variable lengths (FIX - IS TS TRUE) at a 4
-			Hz frequency. We compare this model with a baseline diffusion forcing transformer <a href="#ref_4">[4]</a>
-			that infers an interpolated sequence of frames in between the start and goal frame. Given this inferred
-			sequence, we run an inverse diffusion model on consecutive frames to generate the action sequence. We thus
-			ask the question:
-			<i>can a action-only diffusion model outperform a video-diffusion model for a navigation task?</i><br><br>
+    <div class="content-margin-container" id="background">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <h1>Background and Related Work</h1>
+        <br />
+        <b>Diffusion Models.</b> Introduced in results like <a href="ref_5">[5]</a>, a denoising diffusion model
+        iteratively denoises a sample from Gaussian noise. It defines a forward process where a sample
+        <math display="inline"
+          ><mrow
+            ><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>=</mo><msub><mi>α</mi><mi>k</mi></msub
+            ><msup><mi>x</mi><mn>0</mn></msup
+            ><mo>+</mo><msub><mi>σ</mi><mi>k</mi></msub
+            ><mi>ϵ</mi></mrow
+          ></math
+        >
+        is the noised value of the initial sample
+        <math display="inline"
+          ><msup><mi>x</mi><mn>0</mn></msup></math
+        >
+        after the cumulative Gaussian noise
+        <math display="inline"
+          ><mrow
+            ><mi>ε</mi><mo>&#x223C;</mo><mi>𝒩</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mi>I</mi
+            ><mo stretchy="false">)</mo></mrow
+          ></math
+        >
+        is applied. The model then learns the reverse of this process via a score function
+        <math display="inline"
+          ><mrow
+            ><msub><mi>s</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>≈</mo><mo>∇</mo
+            ><mo lspace="0.167em" rspace="0.167em">log</mo><msub><mi>p</mi><mi>k</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo stretchy="false">)</mo></mrow
+          ></math
+        >
+        which is equivalent via an affine transformation to learning the noise function
+        <math display="inline"
+          ><mrow
+            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
+            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo></mrow
+          ></math
+        >. By learning this, the model must learn the original data distribution in order to determine how much noise
+        was applied to get a certain sample.
+        <br />
+        <b>Action Diffusion Models.</b>
+        <br />
+        <b>Diffusion Forcing Transformer (DFoT).</b>
+        <br />
+        <b>Inverse Dynamic Models.</b>
+        <br />
+        <b>Action Representations.</b>
+        <br />
+      </div>
+      <div class="margin-right-block" style="transform: translate(0%, -100%)">
+        <!-- you can move the margin notes up and down with translate -->
+        Interestingly, Plato also asked if X does Y, in <a href="#ref_1">[1]</a>.
+      </div>
+    </div>
 
-			Both models use the diffusion paradigm to generate an action sequence sampled from the distribution of
-			possible paths from the start to finish, a necessary task given that there is never one unique action
-			sequence from point A to point B. Instead, we want to sample from the distribution of all possible action
-			sequences. However, by directly generating action sequences, we hypothesize that the generative model can
-			decouple the action dynamics from the image generation, leading to more consistent and executable
-			trajectories. In contrast, we wonder if the video generative model could generate visually plausable but
-			dynamically infeasible trajectories.<br><br>
-			This project targets a specific gap in the literature. Diffusion Policy <a href="#ref_1">[1]</a> uses a
-			control loop to iteratively diffuse action chunks. Existing inverse dynamics models can also infer action
-			deltas between consecutive frames. However, we ask the specific question about interpolating action
-			sequences given a ground truth start and end image.
+    <div class="content-margin-container">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <h1>Another section</h1>
+        In this section we embed a video:
+        <video class="my-video" loop autoplay muted style="width: 725px">
+          <source src="./images/mtsh.mp4" type="video/mp4" />
+        </video>
+      </div>
+      <div class="margin-right-block">A caption for the video could go here.</div>
+    </div>
 
+    <div class="content-margin-container" id="implications_and_limitations">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <h1>Implications and limitations</h1>
+        Let's end with some discussion of the implications and limitations.
+      </div>
+      <div class="margin-right-block"></div>
+    </div>
 
-		</div>
-		<div class="margin-right-block">
-			Margin note that clarifies some detail #main-content-block for intro section.
-		</div>
-	</div>
-
-	<div class="content-margin-container" id="background">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<h1>Background and Related Work</h1>
-			<b>Diffusion Models.</b>
-			<b>Action Diffusion Models.</b>
-			<b>Diffusion Forcing Transformer (DFoT).</b>
-			<b>Inverse Dynamic Models.</b>
-			<b>Action Representations.</b>
-
-
-
-
-
-			Now let's write some math!<br>
-			<center>
-				<math xmlns="http://www.w3.org/1998/Math/MathML">
-					<mrow>
-						<mrow>
-							<mo>&#x2202;</mo>
-							<mi>y</mi>
-						</mrow>
-						<mo>/</mo>
-						<mrow>
-							<mo>&#x2202;</mo>
-							<mi>x</mi>
-						</mrow>
-					</mrow>
-					<mo>=</mo>
-					<mi>x</mi>
-				</math>
-			</center>
-			<br>
-			It's probably best to ask an LLM to help do the web
-			formatting for math. You can tell it "convert this latex equation into MathML: $$\frac{\partial dy}{\partial
-			dx} = x$$"
-			But it took me a few tries. So, if you get frustrated, you can embed an image of the equation, or use other
-			packages for
-			rendering equations on webpages.
-		</div>
-		<div class="margin-right-block" style="transform: translate(0%, -100%);">
-			<!-- you can move the margin notes up and down with translate -->
-			Interestingly, Plato also asked if X does Y, in <a href="#ref_1">[1]</a>.
-		</div>
-	</div>
-
-	<div class="content-margin-container">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<h1>Another section</h1>
-			In this section we embed a video:
-			<video class='my-video' loop autoplay muted style="width: 725px">
-				<source src="./images/mtsh.mp4" type="video/mp4">
-			</video>
-		</div>
-		<div class="margin-right-block">
-			A caption for the video could go here.
-		</div>
-	</div>
-
-	<div class="content-margin-container" id="implications_and_limitations">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<h1>Implications and limitations</h1>
-			Let's end with some discussion of the implications and limitations.
-		</div>
-		<div class="margin-right-block">
-		</div>
-	</div>
-
-	<div class="content-margin-container" id="citations">
-		<div class="margin-left-block">
-		</div>
-		<div class="main-content-block">
-			<div class='citation' id="references" style="height:auto"><br>
-				<span style="font-size:16px">References:</span><br><br>
-				<a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion</a>, FIX<br><br>
-				<a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">ACT</a>, FIX<br><br>
-				<a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">R10K</a>, FIX<br><br>
-				<a id="ref_3"></a>[4] <a href="https://arxiv.org/abs/2502.06764">DFOT</a>, FIX<br><br>
-
-			</div>
-		</div>
-		<div class="margin-right-block">
-			<!-- margin notes for reference block here -->
-		</div>
-	</div>
-
-</body>
-
+    <div class="content-margin-container" id="citations">
+      <div class="margin-left-block"></div>
+      <div class="main-content-block">
+        <div class="citation" id="references" style="height: auto">
+          <br />
+          <span style="font-size: 16px">References:</span><br /><br />
+          <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion</a>, FIX<br /><br />
+          <a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">ACT</a>, FIX<br /><br />
+          <a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">R10K</a>, FIX<br /><br />
+          <a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">DFOT</a>, FIX<br /><br />
+          <a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2502.06764">Diffusion models</a>, FIX<br /><br />
+        </div>
+      </div>
+      <div class="margin-right-block">
+        <!-- margin notes for reference block here -->
+      </div>
+    </div>
+  </body>
 </html>
