@@ -391,19 +391,8 @@
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
             ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo></mrow
           ></math
-<<<<<<< HEAD
-        >. By learning this, the model must learn the original data distribution
-        in order to determine how much noise was applied to get a certain
-        sample.
-
-        <br /><br />
-=======
-        >. By learning this, the model must learn the original data distribution in order to determine how much noise
-        was applied to get a certain sample.
-
->>>>>>> 56331d9d92b9fa5cabb3143923194cefa7520828
-        <b>Diffusion Forcing Transformer (DFoT).</b>
-        > through the loss function
+        >
+        through the loss function
         <math display="block" style="margin-top: 1em; margin-bottom: 1em"
           ><mrow
             ><mi>ℒ</mi><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo><mo>=</mo
@@ -492,30 +481,9 @@
             ><mo stretchy="false">)</mo></mrow
           ></math
         >
-<<<<<<< HEAD
-        and use it in a closed loop where they then sample an action chunk,
-        execute part of it, recollect the observation buffer, and repeat. We use
-        a similar idea of action denoising, yet we use a one-shot method where
-        we generate the entire action sequence at the beginning instead of using
-        the control loop.
-        <br />
-        <br />
-        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video
-        generation originally applied a constant noise level to each frame in
-        the video sequence to then denoise. However, Diffusion Forcing and
-        Diffusion Forcing Transformers <a href="#ref_4">[4]</a>
-        <a href="#ref_7">[7]</a> change this paradigm by applying independently
-        random levels of noise to each frame. This allows us to view the noise
-        as a form of masking and therefore generate multiple types of videos,
-        from interpolating between ground truth frames to generating
-        open-horizon video sequences. This project will use DFoT for video
-        generation conditioned on both the start and end frames (interpolation)
-        and just the start frames to get a possible navigation sequence.
-=======
         and use it in a closed loop where they then sample an action chunk, execute part of it, recollect the
         observation buffer, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
-        generate the entire action sequence at the beginning instead of using the control loop.
-        <br /><br />
+        generate the entire action sequence at the beginning instead of using the control loop. <br /><br />
         <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video generation originally applied a constant noise
         level to each frame in the video sequence to then denoise. However, Diffusion Forcing and Diffusion Forcing
         Transformers <a href="#ref_4">[4]</a> <a href="#ref_7">[7]</a> change this paradigm by applying independently
@@ -523,7 +491,6 @@
         generate multiple types of videos, from interpolating between ground truth frames to generating open-horizon
         video sequences. This project will use DFoT for video generation conditioned on both the start and end frames
         (interpolation) and just the start frames to get a possible navigation sequence.
->>>>>>> 56331d9d92b9fa5cabb3143923194cefa7520828
         <br />
         <br />
         <b>Inverse Dynamic Models.</b>
@@ -550,8 +517,8 @@
       <div class="main-content-block">
         <h1>Methods</h1>
         <b>Action Representations.</b>
-        For action represetation, we converted consecutive camera poses into
-        relative special euclidean group, SE(3) motions.
+        For action represetation, we converted consecutive camera poses into relative special euclidean group, SE(3)
+        motions.
 
         <p>An SE(3) transformation consists of:</p>
         <ul>
@@ -562,8 +529,8 @@
         Each frame provides a 3×4 camera extrinsic matrix
         <math display="inline"
           ><mrow
-            ><mi>E</mi><mo>=</mo><mo stretchy="false">[</mo><mi>R</mi><mo>|</mo
-            ><mi>t</mi><mo stretchy="false">]</mo></mrow
+            ><mi>E</mi><mo>=</mo><mo stretchy="false">[</mo><mi>R</mi><mo>|</mo><mi>t</mi
+            ><mo stretchy="false">]</mo></mrow
           ></math
         >, and for every adjacent frame pair we computed the relative transform
         <math display="block" style="margin-top: 1em; margin-bottom: 1em"
@@ -577,16 +544,15 @@
             ></mrow
           ></math
         >
-        using the analytic SE(3) inverse. This relative pose represents the
-        motion of the camera between consecutive frames.
+        using the analytic SE(3) inverse. This relative pose represents the motion of the camera between consecutive
+        frames.
         <br /><br />
-        To obtain a compact and regression-friendly action target, we mapped
-        each relative transform into its Lie algebra representation using the
-        SE(3) logarithm. This produces a 6D twist vector
+        To obtain a compact and regression-friendly action target, we mapped each relative transform into its Lie
+        algebra representation using the SE(3) logarithm. This produces a 6D twist vector
         <math display="inline"
           ><mrow
-            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo
-            ><mi>ω</mi><mo stretchy="false">)</mo></mrow
+            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo><mi>ω</mi
+            ><mo stretchy="false">)</mo></mrow
           ></math
         >, where
         <math display="inline"
@@ -600,38 +566,23 @@
             ><mi>ω</mi><mo>∈</mo><msup><mi>ℝ</mi><mn>3</mn></msup></mrow
           ></math
         >
-        represents rotational motion in axis-angle form. The rotational
-        component was extracted from the relative rotation matrix using the
-        SO(3) log map, while the translational component was recovered using the
-        inverse left Jacobian of SO(3), which accounts for coupling between
-        rotation and translation.
+        represents rotational motion in axis-angle form. The rotational component was extracted from the relative
+        rotation matrix using the SO(3) log map, while the translational component was recovered using the inverse left
+        Jacobian of SO(3), which accounts for coupling between rotation and translation.
         <br /><br />
-        
 
         <br />
         <br />
 
         <b>Inverse Dynamics Models.</b>
-        We trained both an MLP (multi-layer perceptron) and a Transformer head
-        on the DINO features. However, we found that the DINO features were not
-        well-suited for our task, as they were trained on a different domain and
-        did not capture the relevant information for action inference in our
-        setting. (include loss on MLP and Transformer head DINO) We also tried a
-        simple MLP architecture without a backbone, as described in (cnn idm
-        citation). This model performed the worse, and was unable to converge
-        given our training parameters. For our final inverse dynamics model, we
-        used a CroCo backbone, which is trained on video data and thus has more
-        relevant features for our task. 
-      </div>
-      <div class="margin-right-block">
-        A caption for the video could go here.
         We trained both an MLP (multi-layer perceptron) and a Transformer head on the DINO features. However, we found
         that the DINO features were not well-suited for our task, as they were trained on a different domain and did not
         capture the relevant information for action inference in our setting. (include loss on MLP and Transformer head
         DINO) We also tried a simple MLP architecture without a backbone, as described in (cnn idm citation). This model
-        performed the worse, and was unable to converge given our training parameters. Finally, we trained a CNN
+        performed the worse, and was unable to converge given our training parameters. For our final inverse dynamics
+        model, we used a CroCo backbone, which is trained on video data and thus has more relevant features for our
+        task.
       </div>
-      <div class="margin-right-block">A caption for the video could go here.</div>
     </div>
 
     <div class="content-margin-container" id="implications_and_limitations">
