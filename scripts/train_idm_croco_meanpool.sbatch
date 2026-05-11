@@ -95,7 +95,7 @@ srun env -u WANDB_RUN_ID python -u inverse_dynamics.py \
     --batch_size    64 \
     --num_workers   "${SLURM_CPUS_PER_TASK}" \
     --num_epochs    100 \
-    --ckpt_dir      "checkpoints/idm_croco_mp_${SLURM_JOB_ID}" \
+    --ckpt_dir      "checkpoints/idm_croco_mp_4hz_${SLURM_JOB_ID}" \
     --ckpt_every    10 \
     "${RESUME_ARGS[@]}" \
     --wandb \

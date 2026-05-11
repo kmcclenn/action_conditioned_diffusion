@@ -16,6 +16,7 @@ dependencies:
   - jpeg
   - libpng
   - tqdm
-  - pip
+  - matplotlib
+  - scikit-learn
   - pip:
     - wandb

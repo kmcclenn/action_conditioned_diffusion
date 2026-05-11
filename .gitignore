@@ -7,6 +7,12 @@ logs/
 envs/
 features_croco/
 checkpoints/
+<<<<<<< HEAD
 wandb/
 wandb_logs/
 pretrained_models/
+=======
+cookies.txt
+eval/
+clip_lists/train_new.txt
+>>>>>>> origin/main
