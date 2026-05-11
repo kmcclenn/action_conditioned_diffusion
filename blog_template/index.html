@@ -473,7 +473,7 @@
         <br /><br />
         <b>Action Diffusion Models.</b> Following the diffusion model paradigm, <a href="#ref_1">[1]</a> showed that one
         can iteratively denoise action sequences to ultimately generate a action plan distributed according to some
-        imitation dataset. Concretely, they predict the conditional distribition
+        imitation dataset. Concretely, they predict the conditional distribution
         <math display="inline"
           ><mrow
             ><mi>p</mi><mo stretchy="false">(</mo><msub><mi>A</mi><mi>t</mi></msub
@@ -502,7 +502,7 @@
         shown success in many downstream computer vision tasks (CITE DINO). In particular, CroCo is trained using a
         <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model is given a sequence of frames with one frame
         missing, and must predict the missing frame, and thus are a promising backbone for our video-based inverse
-        dynamics modeling.
+        dynamics modeling. (TODO explain a little more about croco)
 
         <br />
         <br />
@@ -575,13 +575,13 @@
         <br />
 
         <b>Inverse Dynamics Models.</b>
-        We trained both an MLP (multi-layer perceptron) and a Transformer head on the DINO features. However, we found
-        that the DINO features were not well-suited for our task, as they were trained on a different domain and did not
-        capture the relevant information for action inference in our setting. (include loss on MLP and Transformer head
-        DINO) We also tried a simple MLP architecture without a backbone, as described in (cnn idm citation). This model
-        performed the worse, and was unable to converge given our training parameters. For our final inverse dynamics
-        model, we used a CroCo backbone, which is trained on video data and thus has more relevant features for our
-        task.
+        We trained both an MLP (multi-layer perceptron) and a Transformer head on the CrocoV2 features. CrocoV2 is
+        specificaly suited for downstream pose estimation tasks like Dust3R <a href="#ref_8">[8]</a>, making it a
+        reasonable choice for a pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2
+        embedding <a href="#ref_11">[11]</a> and also a pure CNN from pixel-space like in <a href="#ref_10">[10]</a>,
+        but the DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM
+        was impractical due to compute limitations. Thus, for our final inverse dynamics model, we used a CroCo
+        backbone, which is trained on video data and thus has more relevant features for our task.
       </div>
     </div>
 
@@ -607,6 +607,7 @@
           <a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2502.06764">Diffusion models</a>, FIX<br /><br />
           <a id="ref_6"></a>[6] <a href="https://arxiv.org/pdf/2207.12598">CFG</a>, FIX<br /><br />
           <a id="ref_7"></a>[7] <a href="https://arxiv.org/abs/2407.01392">Diffusion forcing</a>, FIX<br /><br />
+          <a id="ref_8"></a>[8] <a href="https://arxiv.org/abs/2312.14132">Dust3R</a>, FIX<br /><br />
 
           <!-- include a buffer for easy citation merging -->
           <a id="ref_9"></a>[10] <a href="https://arxiv.org/pdf/2302.00111">cnn idm</a>, FIX<br /><br />
