@@ -710,8 +710,7 @@
           ><mrow><mi>w</mi><mo>&gt;</mo><mn>0</mn></mrow></math
         >
         pushes the sample more in the direction of the conditional distribution.<br /><br />
-        In this blog, we use CFG for both the generation of video frames as well as the generation of action sequences
-        for the downstream navigation task.
+       In this blog, we use CFG during sampling for both the video and action diffusion models.
 
         <br /><br />
         <b>Action Diffusion Models.</b> Following the diffusion model paradigm, <a href="#ref_1">[1]</a> showed that one
@@ -724,16 +723,15 @@
             ><mo stretchy="false">)</mo></mrow
           ></math
         >
-        and use it in a closed loop where they then sample an action chunk, execute part of it, recollect the
-        observation buffer, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
-        generate the entire action sequence at the beginning instead of using the control loop. <br /><br />
-        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video generation originally applied a constant noise
-        level to each frame in the video sequence to then denoise. However, Diffusion Forcing and Diffusion Forcing
+        and use it in a closed loop where they sample action chunks, execute them, update observations, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
+        generate the entire action sequence at the beginning instead of replanning during execution. <br /><br />
+
+        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video generation traditionally applies a constant noise
+        level to each frame in the video sequence during denoising. However, Diffusion Forcing and Diffusion Forcing
         Transformers <a href="#ref_4">[4]</a> <a href="#ref_7">[7]</a> change this paradigm by applying independently
-        random levels of noise to each frame. This allows us to view the noise as a form of masking and therefore
+        random levels of noise to each frame. This allows us to view the noise as a form of temporal masking and therefore
         generate multiple types of videos, from interpolating between ground truth frames to generating open-horizon
-        video sequences. This project will use DFoT for video generation conditioned on both the start and end frames
-        (interpolation) and just the start frames to get a possible navigation sequence.
+        video sequences. This project will use DFoT as the baseline representation of state-of-the-art video generation methods for action planning.
         <br />
         <br />
         <b>Image Embeddings.</b>
@@ -743,9 +741,7 @@
         is to use a pre-trained visual encoder as a backbone for the inverse dynamics model (CITE). Visual encoders such
         as DINO and CroCo learn feature representations from images and videos using self-supervised learning, and have
         shown success in many downstream computer vision tasks (CITE DINO). In particular, CroCo is trained using a
-        <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model is given a sequence of frames with one frame
-        missing, and must predict the missing frame, and thus are a promising backbone for our video-based inverse
-        dynamics modeling. CroCo extends masked image modeling to pairs of images depicting the same scene from different viewpoints. Given the two views, the model masks a large fraction of the first image and tasks a ViT-based encoder with reconstructing them, conditioned on the fully-visible second image through cross-attention in the decoder. Because the masked content of one view can usually be recovered from the other view only by reasoning about scene geometry and the relative camera pose, the pretraining objective forces the encoder to learn features that capture spatial relationships between the views rather than just semantics. Pretraining on millions of real-world image pairs (on indoor and outdoor scenes) makes CroCo features well-suited as a backbone for downstream geometric tasks.
+        <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model reconstructs masked regions of one view using information from the second view of the scene. Because the masked regions can usually be recovered by reasoning about scene geometry and the relative camera pose, the pretraining objective forces the encoder to learn features that capture spatial relationships between the views rather than just semantics. Pretraining on millions of real-world image pairs (on indoor and outdoor scenes) makes CroCo features well-suited as a backbone for downstream geometric tasks.
 
         <br />
         <br />
@@ -824,8 +820,7 @@
         reasonable choice for a pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2
         embedding <a href="#ref_11">[11]</a> and also a pure CNN from pixel-space like in <a href="#ref_10">[10]</a>,
         but the DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM
-        was impractical due to compute limitations. Thus, for our final inverse dynamics model, we used a CroCo
-        backbone, which is trained on video data and thus has more relevant features for our task.
+        was impractical due to compute limitations.
 
         </p>
 <p>
