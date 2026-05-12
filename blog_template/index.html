@@ -249,34 +249,20 @@
           <tr>
             <td colspan="4">
               <span
-                style="
-                  font-size: 32px;
-                  font-family:
-                    &quot;Courier New&quot;, Courier, monospace; /* Adds fallbacks */
-                "
+                style="font-size: 32px; font-family: &quot;Courier New&quot;, Courier, monospace; /* Adds fallbacks */"
                 >Action Diffusion Models on Real Estate House Tours</span
               >
             </td>
           </tr>
           <tr>
             <td align="left">
-              <span style="font-size: 17px"
-                ><a href="https://www.kaimcclennen.com/">Kai McClennen</a></span
-              >
+              <span style="font-size: 17px"><a href="https://www.kaimcclennen.com/">Kai McClennen</a></span>
             </td>
             <td align="left">
-              <span style="font-size: 17px"
-                ><a href="https://www.linkedin.com/in/natalietang04/"
-                  >Natalie Tang</a
-                ></span
-              >
+              <span style="font-size: 17px"><a href="https://www.linkedin.com/in/natalietang04/">Natalie Tang</a></span>
             </td>
             <td align="left">
-              <span style="font-size: 17px"
-                ><a href="https://www.linkedin.com/in/abraham-krebs/"
-                  >AZ Krebs</a
-                ></span
-              >
+              <span style="font-size: 17px"><a href="https://www.linkedin.com/in/abraham-krebs/">AZ Krebs</a></span>
             </td>
           </tr>
 
@@ -297,13 +283,9 @@
           <b style="font-size: 16px">Outline</b><br /><br />
           <a href="#intro">Introduction</a><br /><br />
           <a href="#background">Background/related work</a><br /><br />
-          <a href="#implications_and_limitations"
-            >Methods, figures showing method</a
-          ><br /><br />
-          <a href="#implications_and_limitations">Experiments/results</a
-          ><br /><br />
-          <a href="#implications_and_limitations">Conclusion/discussion</a
-          ><br /><br />
+          <a href="#implications_and_limitations">Methods, figures showing method</a><br /><br />
+          <a href="#implications_and_limitations">Experiments/results</a><br /><br />
+          <a href="#implications_and_limitations">Conclusion/discussion</a><br /><br />
         </div>
       </div>
       <div class="main-content-block" style="display: flex; gap: 10px">
@@ -312,8 +294,7 @@
         <img src="./images/top3.jpg" width="256px" />
       </div>
       <div class="margin-right-block">
-        Various frames from the RealEstate10K dataset, showing the beginnings of
-        the house tour clips.
+        Various frames from the RealEstate10K dataset, showing the beginnings of the house tour clips.
       </div>
     </div>
 
@@ -321,55 +302,39 @@
       <div class="margin-left-block"></div>
       <div class="main-content-block">
         <h1>Introduction</h1>
-        Humans are used to seeing the world through an ego-centric view; we can
-        make all the decision and plans we need from the visual stimulus of our
-        eyes alone. When placed in a room, a human can instantly determine a
-        trajectory to the desired goal location. This ego-centric navigation
-        planning for computers, on the other hand, is a difficult task; many
-        modern action planning results rely on top or side view cameras
-        <a href="#ref_1">[1]</a> <a href="#ref_2">[2]</a>. Thus, we want to see
-        if we could generate action sequences to a goal position given only
-        start and finish images.<br /><br />
-        Concretely, we train a conditional action-diffusion model on the
-        RealEstate10K dataset <a href="#ref_3">[3]</a>, a collection of ego-view
-        house tour clips. Given the (embeddings of) start and goal images from a
-        certain clip, we diffuse action sequences of variable lengths (FIX - IS
-        TS TRUE) at a 4 Hz frequency. We compare this model with a baseline
-        diffusion forcing transformer <a href="#ref_4">[4]</a>
-        that infers an interpolated sequence of frames in between the start and
-        goal frame. Given this inferred sequence, we run an inverse diffusion
-        model on consecutive frames to generate the action sequence. We thus ask
-        the question:
-        <i
-          >can a action-only diffusion model outperform a video-diffusion model
-          for a navigation task?</i
-        ><br /><br />
+        Humans navigate the world from an ego-centric view; we can make every decision and plan we need from the visual
+        stimulus of our eyes alone. When placed in a room, a person can instantly determine a trajectory to a desired
+        goal location. For computers, this kind of ego-centric navigation planning is much harder, and many modern
+        action planning results sidestep the problem by relying on top-down or side-view cameras
+        <a href="#ref_1">[1]</a> <a href="#ref_2">[2]</a>. We want to see whether we can instead generate action
+        sequences to a goal position given only start and finish images.<br /><br />
+        Concretely, we train a conditional action-diffusion model on the RealEstate10K dataset <a href="#ref_3">[3]</a>,
+        a collection of egocentric house tour clips. Given the (embeddings of) start and goal images from a clip, we
+        diffuse action sequences of variable lengths (FIX - IS TS TRUE) at a 4 Hz frequency. We compare this model with
+        a baseline built on a diffusion forcing transformer <a href="#ref_4">[4]</a>
+        which interpolates a sequence of frames between the start and goal and then runs an inverse dynamics model on
+        consecutive frames to recover the action sequence. The question we ask is:
+        <i>can a action-only diffusion model outperform a video-diffusion model for a navigation task?</i><br /><br />
 
-        Both models use the diffusion paradigm to generate an action sequence
-        sampled from the distribution of possible paths from the start to
-        finish, a necessary task given that there is never one unique action
-        sequence from point A to point B. Instead, we want to sample from the
-        distribution of all possible action sequences. However, by directly
-        generating action sequences, we hypothesize that the generative model
-        can decouple the action dynamics from the image generation, leading to
-        more consistent and executable trajectories. In contrast, we wonder if
-        the video generative model could generate visually plausable but
-        dynamically infeasible trajectories.<br /><br />
+        Both models lean on the diffusion paradigm to sample from the distribution of possible paths between the start
+        and goal frames, which is the right framing because there is never a single correct action sequence from point A
+        to point B. The interesting question is what each model is forced to learn along the way. By directly generating
+        actions, we hypothesize that the action-diffusion model can decouple motion dynamics from image synthesis,
+        producing trajectories that are more consistent and physically executable. The video diffusion model, on the
+        other hand, has to commit to a full visual rollout, which leaves room for trajectories that look plausible
+        frame-to-frame but are dynamically infeasible when you try to extract the underlying motion.<br /><br />
         This project targets a specific gap in the literature. Diffusion Policy
-        <a href="#ref_1">[1]</a> uses a control loop to iteratively diffuse
-        action chunks. Existing inverse dynamics models can also infer action
-        deltas between consecutive frames. However, we ask the specific question
-        about interpolating action sequences given a ground truth start and end
-        image.
+        <a href="#ref_1">[1]</a> iteratively diffuses action chunks inside a closed control loop, and existing inverse
+        dynamics models can recover action deltas between consecutive frames. Neither directly addresses our question:
+        how to interpolate a full action sequence given only a ground truth start and end image.
       </div>
       <div class="margin-right-block">
         Here, actions are represented as
         <i>twists</i> where
         <math display="inline"
           ><mrow
-            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo
-            ><mi>ω</mi><mo stretchy="false">)</mo><mo>∈</mo
-            ><msup><mi>ℝ</mi><mn>6</mn></msup></mrow
+            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo><mi>ω</mi><mo stretchy="false">)</mo
+            ><mo>∈</mo><msup><mi>ℝ</mi><mn>6</mn></msup></mrow
           ></math
         >.
       </div>
@@ -380,14 +345,11 @@
       <div class="main-content-block">
         <h1>Background and Related Work</h1>
         <br />
-        <b>Diffusion Models.</b> Introduced in results like
-        <a href="ref_5">[5]</a>, a denoising diffusion model iteratively
-        denoises a sample from Gaussian noise to generate samples from the data
-        distribution
+        <b>Diffusion Models.</b> Introduced in results like <a href="ref_5">[5]</a>, a denoising diffusion model
+        iteratively denoises a sample from Gaussian noise to generate samples from the data distribution
         <math display="inline"
           ><mrow
-            ><mi>p</mi><mo stretchy="false">(</mo
-            ><msup><mi>x</mi><mn>0</mn></msup
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
             ><mo stretchy="false">)</mo></mrow
           ></math
         >. It defines a forward process where a sample
@@ -407,25 +369,22 @@
         after the cumulative Gaussian noise
         <math display="inline"
           ><mrow
-            ><mi>ε</mi><mo>&#x223C;</mo><mi>𝒩</mi><mo stretchy="false">(</mo
-            ><mn>0</mn><mo>,</mo><mi>I</mi><mo stretchy="false">)</mo></mrow
+            ><mi>ε</mi><mo>&#x223C;</mo><mi>𝒩</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mi>I</mi
+            ><mo stretchy="false">)</mo></mrow
           ></math
         >
-        is applied. The model then learns the reverse of this process via a
-        score function
+        is applied. The model then learns the reverse of this process via a score function
         <math display="inline"
           ><mrow
             ><msub><mi>s</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
             ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>≈</mo><mo>∇</mo
-            ><mo lspace="0.167em" rspace="0.167em">log</mo
-            ><msub><mi>p</mi><mi>k</mi></msub
+            ><mo lspace="0.167em" rspace="0.167em">log</mo><msub><mi>p</mi><mi>k</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
             ><mo stretchy="false">)</mo></mrow
           ></math
         >
-        which is equivalent via an affine transformation to learning the noise
-        function
+        which is equivalent via an affine transformation to learning the noise function
         <math display="inline"
           ><mrow
             ><msub><mi>ε</mi><mi>θ</mi></msub
@@ -436,77 +395,64 @@
         through the loss function
         <math display="block" style="margin-top: 1em; margin-bottom: 1em"
           ><mrow
-            ><mi>ℒ</mi><mo stretchy="false">(</mo><mi>θ</mi
-            ><mo stretchy="false">)</mo><mo>=</mo
+            ><mi>ℒ</mi><mo stretchy="false">(</mo><mi>θ</mi><mo stretchy="false">)</mo><mo>=</mo
             ><msub
               ><mrow
-                ><mo fence="true" lspace="0.2em" rspace="0.2em">‖</mo
-                ><msub><mi>ϵ</mi><mi>θ</mi></msub
+                ><mo fence="true" lspace="0.2em" rspace="0.2em">‖</mo><msub><mi>ϵ</mi><mi>θ</mi></msub
                 ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
-                ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>−</mo
-                ><mi>ϵ</mi
+                ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>−</mo><mi>ϵ</mi
                 ><mo fence="true" lspace="0.2em" rspace="0.2em">‖</mo></mrow
               ><mn>2</mn></msub
             ></mrow
           ></math
         >
         <div class=""></div>
-        By learning this, the model must learn the original data distribution in
-        order to determine how much noise was applied to get a certain sample.
+        By learning this, the model must learn the original data distribution in order to determine how much noise was
+        applied to get a certain sample.
         <br /><br />
-        These vanilla diffusion models can generate samples from a given
-        distribution, yet often we want to condition the generation on some
-        prompt. To do this, Classifier-Free Guidance (CFG)
-        <a href="#ref_6">[6]</a> trains both an unconditional model over the
-        distribution
+        These vanilla diffusion models can generate samples from a given distribution, yet often we want to condition
+        the generation on some prompt. To do this, Classifier-Free Guidance (CFG)
+        <a href="#ref_6">[6]</a> trains both an unconditional model over the distribution
         <math display="inline"
           ><mrow
-            ><mi>p</mi><mo stretchy="false">(</mo
-            ><msup><mi>x</mi><mn>0</mn></msup
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
             ><mo stretchy="false">)</mo></mrow
           ></math
         >
         and a conditional model that approximates the distribution
         <math display="inline"
           ><mrow
-            ><mi>p</mi><mo stretchy="false">(</mo
-            ><msup><mi>x</mi><mn>0</mn></msup
+            ><mi>p</mi><mo stretchy="false">(</mo><msup><mi>x</mi><mn>0</mn></msup
             ><mo>|</mo><mi>c</mi><mo stretchy="false">)</mo></mrow
           ></math
-        >. Like in standard diffusion, these models are parameterized through
-        the noise function
+        >. Like in standard diffusion, these models are parameterized through the noise function
         <math display="inline"
           ><mrow
             ><msub><mi>ε</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
-            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi
-            ><mo stretchy="false">)</mo></mrow
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo stretchy="false">)</mo></mrow
           ></math
-        >, where the unconditional model simply adds a null token as the
-        conditioning to become
+        >, where the unconditional model simply adds a null token as the conditioning to become
         <math display="inline"
           ><mrow
             ><msub><mi>ε</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
-            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>=</mo
-            ><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>=</mo><msub><mi>ε</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
-            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo>=</mo><mi>∅</mi
-            ><mo stretchy="false">)</mo></mrow
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo>=</mo><mi>∅</mi><mo stretchy="false">)</mo></mrow
           ></math
-        >. On sampling, a guidance scale
-        <math display="inline"><mi>w</mi></math> is introduced so that
+        >. On sampling, a guidance scale <math display="inline"><mi>w</mi></math> is introduced so that
 
         <math display="block" style="margin-top: 1em; margin-bottom: 1em"
           ><mrow
             ><msub
               ><mover><mi>ε</mi><mo>^</mo></mover
               ><mi>k</mi></msub
-            ><mo>=</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>w</mi
-            ><mo stretchy="false">)</mo><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo>=</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>w</mi><mo stretchy="false">)</mo
+            ><msub><mi>ε</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
-            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo stretchy="false">)</mo
-            ><mo>−</mo><mi>w</mi><msub><mi>ε</mi><mi>θ</mi></msub
+            ><mo>,</mo><mi>k</mi><mo>,</mo><mi>c</mi><mo stretchy="false">)</mo><mo>−</mo><mi>w</mi
+            ><msub><mi>ε</mi><mi>θ</mi></msub
             ><mo stretchy="false">(</mo><msup><mi>x</mi><mi>k</mi></msup
             ><mo>,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>.</mo></mrow
           ></math
@@ -516,47 +462,38 @@
         <math display="inline"
           ><mrow><mi>w</mi><mo>=</mo><mn>0</mn></mrow></math
         >
-        becaomes standard conditioning, and any higher
+        becomes standard conditioning, and any higher
         <math display="inline"
           ><mrow><mi>w</mi><mo>&gt;</mo><mn>0</mn></mrow></math
         >
-        pushes the sample more in the direction of the conditional
-        distribution.<br /><br />
-        In this blog, we use CFG for both the generation of video frames as well
-        as the generation of action sequences for the downstream navigation
-        task.
+        pushes the sample more in the direction of the conditional distribution.<br /><br />
+        In this blog, we use CFG for both the generation of video frames as well as the generation of action sequences
+        for the downstream navigation task.
 
         <br /><br />
         <b>Action Diffusion Models.</b> Following the diffusion model paradigm, <a href="#ref_1">[1]</a> showed that one
-        can iteratively denoise action sequences to ultimately generate a action plan distributed according to some
+        can iteratively denoise action sequences to ultimately generate an action plan distributed according to some
         imitation dataset. Concretely, they predict the conditional distribution
         <math display="inline"
           ><mrow
-            ><mi>p</mi><mo stretchy="false">(</mo
-            ><msub><mi>A</mi><mi>t</mi></msub
+            ><mi>p</mi><mo stretchy="false">(</mo><msub><mi>A</mi><mi>t</mi></msub
             ><mo>|</mo><msub><mi>O</mi><mi>t</mi></msub
             ><mo stretchy="false">)</mo></mrow
           ></math
         >
-        and use it in a closed loop where they then sample an action chunk,
-        execute part of it, recollect the observation buffer, and repeat. We use
-        a similar idea of action denoising, yet we use a one-shot method where
-        we generate the entire action sequence at the beginning instead of using
-        the control loop. <br /><br />
-        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video
-        generation originally applied a constant noise level to each frame in
-        the video sequence to then denoise. However, Diffusion Forcing and
-        Diffusion Forcing Transformers <a href="#ref_4">[4]</a>
-        <a href="#ref_7">[7]</a> change this paradigm by applying independently
-        random levels of noise to each frame. This allows us to view the noise
-        as a form of masking and therefore generate multiple types of videos,
-        from interpolating between ground truth frames to generating
-        open-horizon video sequences. This project will use DFoT for video
-        generation conditioned on both the start and end frames (interpolation)
-        and just the start frames to get a possible navigation sequence.
+        and use it in a closed loop where they then sample an action chunk, execute part of it, recollect the
+        observation buffer, and repeat. We use a similar idea of action denoising, yet we use a one-shot method where we
+        generate the entire action sequence at the beginning instead of using the control loop. <br /><br />
+        <b>Diffusion Forcing Transformer (DFoT).</b> Conditional video generation originally applied a constant noise
+        level to each frame in the video sequence to then denoise. However, Diffusion Forcing and Diffusion Forcing
+        Transformers <a href="#ref_4">[4]</a> <a href="#ref_7">[7]</a> change this paradigm by applying independently
+        random levels of noise to each frame. This allows us to view the noise as a form of masking and therefore
+        generate multiple types of videos, from interpolating between ground truth frames to generating open-horizon
+        video sequences. This project will use DFoT for video generation conditioned on both the start and end frames
+        (interpolation) and just the start frames to get a possible navigation sequence.
         <br />
         <br />
-        <b>Inverse Dynamic Models.</b>
+        <b>Image Embeddings.</b>
         A core issue in robotics is the lack of scalable and diverse action data. Inverse dynamics models provide a
         solution, by acting as a bridge between video data and action sequences. Because raw image observations are
         high-dimensional, and may encode a lot of information that is irrelevant for action inference, a common approach
@@ -565,7 +502,14 @@
         shown success in many downstream computer vision tasks (CITE DINO). In particular, CroCo is trained using a
         <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model is given a sequence of frames with one frame
         missing, and must predict the missing frame, and thus are a promising backbone for our video-based inverse
-        dynamics modeling. (TODO explain a little more about croco)
+        dynamics modeling. CroCo extends masked image modeling to pairs of images depicting the same scene from
+        different viewpoints. Given the two views, the model masks a large fraction of the first image and tasks a
+        ViT-based encoder with reconstructing them, conditioned on the fully-visible second image through
+        cross-attention in the decoder. Because the masked content of one view can usually be recovered from the other
+        view only by reasoning about scene geometry and the relative camera pose, the pretraining objective forces the
+        encoder to learn features that capture spatial relationships between the views rather than just semantics.
+        Pretraining on millions of real-world image pairs (on indoor and outdoor scenes) makes CroCo features
+        well-suited as a backbone for downstream geometric tasks.
 
         <br />
         <br />
@@ -579,98 +523,337 @@
       <div class="margin-left-block"></div>
       <div class="main-content-block">
         <h1>Methods</h1>
-        <b>Action Representations.</b>
-        For action represetation, we converted consecutive camera poses into
-        relative special euclidean group, SE(3) motions.
+        <p><b>Action Representations.</b></p>
+        <p>
+          For action representation, we converted consecutive camera poses into relative special euclidean group, SE(3)
+          motions. An SE(3) transformation consists of a rotation
+          <math display="inline">
+            <mi>R</mi>
+          </math>
+          and a translation
+          <math display="inline">
+            <mi>t</mi> </math
+          >. Each frame provides a 3×4 camera extrinsic matrix
+          <math display="inline"
+            ><mrow
+              ><mi>E</mi><mo>=</mo><mo stretchy="false">[</mo><mi>R</mi><mo>|</mo><mi>t</mi
+              ><mo stretchy="false">]</mo></mrow
+            ></math
+          >, and for every adjacent frame pair we computed the relative transform
+          <math display="block" style="margin-top: 1em; margin-bottom: 1em"
+            ><mrow
+              ><msub><mi>E</mi><mi>rel</mi></msub
+              ><mo>=</mo
+              ><msub
+                ><mi>E</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><msubsup
+                ><mi>E</mi><mi>t</mi><mrow><mo>-</mo><mn>1</mn></mrow></msubsup
+              ></mrow
+            ></math
+          >
+          using the analytic SE(3) inverse. This relative pose represents the motion of the camera between consecutive
+          frames.
+        </p>
+        <p>
+          To obtain a compact and regression-friendly action target, we mapped each relative transform into its Lie
+          algebra representation using the SE(3) logarithm. This produces a 6D twist vector
+          <math display="inline"
+            ><mrow
+              ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo><mi>ω</mi
+              ><mo stretchy="false">)</mo></mrow
+            ></math
+          >, where
+          <math display="inline"
+            ><mrow
+              ><mi>v</mi><mo>∈</mo><msup><mi>ℝ</mi><mn>3</mn></msup></mrow
+            ></math
+          >
+          represents translational motion and
+          <math display="inline"
+            ><mrow
+              ><mi>ω</mi><mo>∈</mo><msup><mi>ℝ</mi><mn>3</mn></msup></mrow
+            ></math
+          >
+          represents rotational motion in axis-angle form. The rotational component was extracted from the relative
+          rotation matrix using the SO(3) log map, while the translational component was recovered using the inverse
+          left Jacobian of SO(3), which accounts for coupling between rotation and translation.
+        </p>
+        <p>
+          <b>Inverse Dynamics Models.</b>
+        </p>
+        <p>
+          We trained both an MLP and a Transformer head on the CrocoV2 features. CrocoV2 is specifically suited for
+          downstream pose estimation tasks like Dust3R <a href="#ref_8">[8]</a>, making it a reasonable choice for a
+          pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2 embedding
+          <a href="#ref_11">[11]</a> and also a pure CNN from pixel-space like in <a href="#ref_10">[10]</a>, but the
+          DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM was
+          impractical due to compute limitations. Thus, for our final inverse dynamics model, we used a CroCo backbone,
+          which is trained on video data and thus has more relevant features for our task.
+        </p>
+        <p>
+          Our global action frequency is set at 4 Hz, so thus the IDM must take two consecutive frame embeddings that
+          occur 0.25s apart and return the inferred action. We compute the ground truth action delta
+          <math display="inline"
+            ><msub><mi>a</mi><mi>i</mi></msub></math
+          >
+          using the method from above and then predict the inferred action
+          <math display="inline"
+            ><mrow
+              ><mover><mi>a</mi><mo>^</mo></mover
+              ><mo>=</mo><mi>f</mi><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub
+              ><mo>,</mo
+              ><msub
+                ><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><mo stretchy="false">)</mo></mrow
+            ></math
+          >
+          using Smooth-L1 loss. To reduce magnitude bias, each action is normalized per dimension to have zero mean and
+          standard deviation of 1 and then denormalized after the forward pass. We use an Adam optimizer with a learning
+          rate of
+          <math display="inline"
+            ><msup
+              ><mn>10</mn><mrow><mo>−</mo><mn>4</mn></mrow></msup
+            ></math
+          >
+          and linear warmup over 1000 steps. The batch size is 64 and we train for 200 epochs.
+        </p>
+        <p>
+          The CrocoV2 embeddings in the training set are of size
+          <math display="inline"
+            ><mrow
+              ><mo stretchy="false">[</mo><mi>N</mi><mo>,</mo><mn>196</mn><mo>,</mo><mn>768</mn
+              ><mo stretchy="false">]</mo></mrow
+            ></math
+          >
+          where
+          <math display="inline"
+            ><mrow><mi>N</mi><mo>≈</mo><mn>50000</mn></mrow></math
+          >
+          is the number of image embedding pairs, so to process these we introduce two IDM heads. The first takes a mean
+          pool of the train set to collapse it to size
+          <math display="inline"
+            ><mrow><mo stretchy="false">[</mo><mi>N</mi><mo>,</mo><mn>768</mn><mo stretchy="false">]</mo></mrow></math
+          >. Then,
+          <math display="inline"
+            ><mrow
+              ><msub
+                ><mi>f</mi><mrow><mi>m</mi><mi>l</mi><mi>p</mi></mrow></msub
+              ><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub
+              ><mo>,</mo
+              ><msub
+                ><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><mo stretchy="false">)</mo><mo>=</mo><mi>g</mi><mo stretchy="false">(</mo
+              ><msub><mi>z</mi><mi>i</mi></msub
+              ><mo>,</mo
+              ><msub
+                ><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><mo>,</mo
+              ><msub
+                ><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><mo>−</mo><msub><mi>z</mi><mi>i</mi></msub
+              ><mo stretchy="false">)</mo></mrow
+            ></math
+          >
+          where <math display="inline"><mi>g</mi></math> is a neural network of two linear layers with dropout,
+          layernorm, and a GELU activation function. The second head performs self-attention over
+          <math display="inline"
+            ><mrow
+              ><mo stretchy="false">(</mo><mi>C</mi><mi>L</mi><mi>S</mi><mo>,</mo><msub><mi>z</mi><mi>i</mi></msub
+              ><mo>,</mo
+              ><msub
+                ><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub
+              ><mo stretchy="false">)</mo></mrow
+            ></math
+          >, where
+          <math display="inline"
+            ><mrow><mi>C</mi><mi>L</mi><mi>S</mi></mrow></math
+          >
+          is a learnable token. Learnable 1D positional embeddings (one per patch, shared across the two images) and a
+          learnable image-identity embedding (one vector per image) are added. Four pre-norm Transformer encoder blocks
+          (<math display="inline"
+            ><mrow><mi>d</mi><mo>=</mo><mn>768</mn></mrow></math
+          >, n_heads=12, mlp_ratio=4) run over the resulting length<math display="inline"
+            ><mrow
+              ><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mn>2</mn><mi>N</mi><mo>=</mo><mn>393</mn><mo>,</mo
+              ><mn>768</mn><mo stretchy="false">)</mo></mrow
+            ></math
+          >
+          sequence. Two linear heads from the final CLS embedding produce
+          <math display="inline"
+            ><mrow
+              ><mover><mi>a</mi><mo>^</mo></mover
+              ><mo>∈</mo><msup><mi>ℝ</mi><mn>6</mn></msup></mrow
+            ></math
+          >.
+        </p>
 
-        <p>An SE(3) transformation consists of:</p>
-        <ul>
-          <li><strong>Rotation:</strong> how the object turns in 3D space</li>
-          <li><strong>Translation:</strong> how the object moves in x, y, z</li>
-        </ul>
-
-        Each frame provides a 3×4 camera extrinsic matrix
-        <math display="inline"
-          ><mrow
-            ><mi>E</mi><mo>=</mo><mo stretchy="false">[</mo><mi>R</mi><mo>|</mo
-            ><mi>t</mi><mo stretchy="false">]</mo></mrow
-          ></math
-        >, and for every adjacent frame pair we computed the relative transform
-        <math display="block" style="margin-top: 1em; margin-bottom: 1em"
-          ><mrow
-            ><msub><mi>E</mi><mi>rel</mi></msub
-            ><mo>=</mo
-            ><msub
-              ><mi>E</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub
-            ><msubsup
-              ><mi>E</mi><mi>t</mi><mrow><mo>-</mo><mn>1</mn></mrow></msubsup
-            ></mrow
-          ></math
-        >
-        using the analytic SE(3) inverse. This relative pose represents the
-        motion of the camera between consecutive frames.
-        <br /><br />
-        To obtain a compact and regression-friendly action target, we mapped
-        each relative transform into its Lie algebra representation using the
-        SE(3) logarithm. This produces a 6D twist vector
-        <math display="inline"
-          ><mrow
-            ><mi>a</mi><mo>=</mo><mo stretchy="false">(</mo><mi>v</mi><mo>,</mo
-            ><mi>ω</mi><mo stretchy="false">)</mo></mrow
-          ></math
-        >, where
-        <math display="inline"
-          ><mrow
-            ><mi>v</mi><mo>∈</mo><msup><mi>ℝ</mi><mn>3</mn></msup></mrow
-          ></math
-        >
-        represents translational motion and
-        <math display="inline"
-          ><mrow
-            ><mi>ω</mi><mo>∈</mo><msup><mi>ℝ</mi><mn>3</mn></msup></mrow
-          ></math
-        >
-        represents rotational motion in axis-angle form. The rotational
-        component was extracted from the relative rotation matrix using the
-        SO(3) log map, while the translational component was recovered using the
-        inverse left Jacobian of SO(3), which accounts for coupling between
-        rotation and translation.
-        <br /><br />
-
-        <br />
-        <br />
-
-        <b>Inverse Dynamics Models.</b>
-        We trained both an MLP (multi-layer perceptron) and a Transformer head on the CrocoV2 features. CrocoV2 is
-        specificaly suited for downstream pose estimation tasks like Dust3R <a href="#ref_8">[8]</a>, making it a
-        reasonable choice for a pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2
-        embedding <a href="#ref_11">[11]</a> and also a pure CNN from pixel-space like in <a href="#ref_10">[10]</a>,
-        but the DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM
-        was impractical due to compute limitations. Thus, for our final inverse dynamics model, we used a CroCo
-        backbone, which is trained on video data and thus has more relevant features for our task.
-
-
-        <br />
-        <br />
-        <b>Experimental Setup</b>
-        Baseline Model vs Action Diffusion on 2, 4, 8 second trajectories (8,
-        16, 32 frames respectively), interpolated and non interpolated.
-
-        <br />
-        <br />
         <b>Baseline Models (DFOT + IDM)</b>
-        (tab this somehow) For our video-based baseline, we used a Diffusion Forcing Transformer
-        (DFoT), with actions derived with our CroCo inverse dynamics model. We
-        used pretrained DFoT models from the authors, which were trained on the
-        same RealEstate10K dataset.
+        <p>
+          (tab this somehow) For our video-based baseline, we used a Diffusion Forcing Transformer (DFoT), with actions
+          derived with our CroCo inverse dynamics model. We used pretrained DFoT models from the authors, which were
+          trained on the same RealEstate10K dataset. DFoT allows us to generate interpolated videos between a start and
+          end frame as well as open-ended videos solely given a start frame. After generating the video frames, we run
+          the IDM to generate the inferred actions.
+        </p>
+        <b>Action Diffusion Model</b>
+        <div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+          <img src="./images/model_diagram.png" width="1024px" />
+          <p style="text-align: center; margin: 0">
+            Figure 1: Overview of the action-conditioned diffusion model architecture. The MLP head (left) meanpools the
+            image embeddings, concatenates them with the actions, and then feeds through a series of fully connected
+            layers. The transformer head (right) feeds the actions through a MLP and then executes a series of self and
+            cross-attention blocks with the image embeddings.
+          </p>
+        </div>
+
+        <p>
+          We learn a denoising action diffusion model where, given embeddings of a start frame
+          <math display="inline">
+            <msub><mi>z</mi><mn>0</mn></msub>
+          </math>
+          and an end frame
+          <math display="inline">
+            <msub><mi>z</mi><mi>t</mi></msub> </math
+          >, we sample from the learned action sequence distribution
+          <math display="inline">
+            <mi>p</mi>
+            <mo>(</mo>
+            <msub><mi>a</mi><mn>1</mn></msub>
+            <mo>,</mo>
+            <mo>&#x2026;</mo>
+            <mo>,</mo>
+            <msub><mi>a</mi><mi>t</mi></msub>
+            <mo>|</mo>
+            <msub><mi>z</mi><mn>0</mn></msub>
+            <mo>,</mo>
+            <msub><mi>z</mi><mi>t</mi></msub>
+            <mo>)</mo> </math
+          >. Like Diffusion Policy <a href="#ref_1">[1]</a>, our model denoises action sequences, yet our model has no
+          control loop and is not conditioned on a per-timestep visual observation. We can also replace a null token
+          with the end frame to sample from an open-horizon distribution
+          <math display="inline">
+            <mi>p</mi>
+            <mo>(</mo>
+            <msub><mi>a</mi><mn>1</mn></msub>
+            <mo>,</mo>
+            <mo>&#x2026;</mo>
+            <mo>,</mo>
+            <msub><mi>a</mi><mi>t</mi></msub>
+            <mo>|</mo>
+            <msub><mi>z</mi><mn>0</mn></msub>
+            <mo>)</mo>
+            <mo>=</mo>
+            <mi>p</mi>
+            <mo>(</mo>
+            <msub><mi>a</mi><mn>1</mn></msub>
+            <mo>,</mo>
+            <mo>&#x2026;</mo>
+            <mo>,</mo>
+            <msub><mi>a</mi><mi>t</mi></msub>
+            <mo>|</mo>
+            <msub><mi>z</mi><mn>0</mn></msub>
+            <mo>,</mo>
+            <mo>&#x2205;</mo>
+            <mo>)</mo> </math
+          >. We use a simple DDPM here with CFG for conditioning, a sinusoidal time embedding, and two separate head
+          architectures, much like the IDM.
+        </p>
+
+        <p>
+          The MLP head again flattens the CrocoV2 tokens so that
+          <math display="inline">
+            <mrow>
+              <mi>flat</mi>
+              <mo>(</mo>
+              <msub><mi>z</mi><mn>0</mn></msub>
+              <mo>)</mo>
+            </mrow>
+            <mo>,</mo>
+            <mrow>
+              <mi>flat</mi>
+              <mo>(</mo>
+              <msub><mi>z</mi><mi>t</mi></msub>
+              <mo>)</mo>
+            </mrow>
+            <mo>&#x2208;</mo>
+            <msup><mi>&#x211D;</mi><mn>768</mn></msup> </math
+          >. It then concatenates the two images and runs them through a 2-layer MLP to get a conditioning vector. The
+          diffusion head is then a 2-layer MLP with LayerNorm and GELU activation.
+        </p>
+
+        <p>
+          The transformer head concatenates the image embeddings along the sequence dimension, optionally adding a
+          learned “image-of-origin” embedding to differentiate between the start and finish. The diffusion head then
+          takes the
+          <math display="inline">
+            <mi>n</mi>
+          </math>
+          action tokens, adds positional and time embeddings, and then performs self-attention on the action tokens and
+          cross-attention from the action tokens to the image tokens, repeating
+          <math display="inline">
+            <mi>L</mi>
+            <mo>=</mo>
+            <mn>6</mn>
+          </math>
+          times.
+        </p>
       </div>
     </div>
 
     <div class="content-margin-container" id="implications_and_limitations">
       <div class="margin-left-block"></div>
       <div class="main-content-block">
+        <h1>Experiments and Results</h1>
+        <b>Experimental Setup</b>
+        We evaluated both a baseline video generation pipeline and our proposed action diffusion framework on 2, 4, and
+        8 second video trajectories, each at 4 frames-per-seconds (fps) and corresponding to 8, 16, and 32 frames
+        respectively. We evaluate both standard and interpolated video generation settings. In the standard setting,
+        both the DFoT video diffusion model and our custom action diffusion model were conditioned on only the initial
+        frame. In the interpolated setting, both models were conditioned on the first and last frames of a trajectory
+        and tasked with generating intermediate frames.
+        <br />
+        All experiments were conducted on the Real-Estate-10k-Mini dataset as provided by DFoT, which
+
         <h1>Implications and limitations</h1>
-        Let's end with some discussion of the implications and limitations.
+        <b>Implications:</b> What our comparison says about action-only vs video-based trajectory generation depends on
+        which way the results lean. If action diffusion wins, that supports our core hypothesis: directly modeling the
+        action distribution decouples motion dynamics from image synthesis and avoids the failure mode where visually
+        plausible frames yield dynamically infeasible trajectories. If the two perform comparably, the more interesting
+        reading is that frame-conditioned IDMs are stronger than we gave them credit for, and since video diffusion is
+        improving faster than action-specific generative models, riding that curve via a good IDM may be a more scalable
+        path than building bespoke action models. And if action diffusion underperforms, the likely explanation is that
+        start-and-goal conditioning is too sparse compared to the dense scaffolding DFoT gives the IDM through generated
+        intermediate frames, pointing toward hybrid approaches that use video diffusion for sparse visual anchors and
+        condition action diffusion on those.
+
+        <br /><br />
+        <b>Limitations.</b> A few caveats on what we found. First, our evaluation metrics are imperfect proxies. Action
+        MSE doesn't capture whether the generated trajectory is actually executable; a simulator rollout that executes
+        the predicted twists and measures final pose error would be more meaningful. Second, we never do closed-loop
+        testing: we predict trajectories one-shot and never execute and replan, but real navigation isn't like that.
+        Third, RealEstate10K is camera tours, not robot navigation, so the action distribution reflects what a human
+        videographer films rather than what a robot policy would produce. Finally, IDM quality bounds our baseline. The
+        DFoT pipeline depends on the IDM being good enough to recover actions from generated frames, so if the IDM is
+        the bottleneck, we're not really comparing action diffusion to video diffusion. We're comparing it to the IDM's
+        ceiling. <br /><br />
+        <b>Future work.</b> Several of our choices were driven by compute rather than design. 4 Hz is fine for
+        RealEstate10K but low for real robot control, where locomotion policies run at 10 to 500 Hz. We capped
+        trajectories at short horizons because longer sequences blow up memory in the diffusion transformer, trained on
+        RealEstate10K-Mini instead of the full dataset, and never got to sweep over conditioning strategies, action
+        representations, or guidance scales. With more compute, the experiments we'd most want to run are: (1) a
+        backbone scale ablation swapping in CroCo v2 Large to test whether richer features close the gap; (2) a
+        conditioning ablation comparing start-only, start+end, and start+waypoints+end, since intermediate waypoints
+        might give action diffusion the scaffolding DFoT gets from generated frames; (3) a stronger IDM baseline (full
+        CroCo v2 or a Dust3R-style direct pose regression model) to disentangle whether our results are about action vs
+        video diffusion or just about IDM quality. <br /><br />
+        Beyond compute, the most interesting direction is moving to simulation: train on ego-view data from a robot in
+        Isaac Sim or Habitat and test whether the diffused action sequences are actually executable on a real platform.
+        Even without a real robot, closed-loop rollout in sim would give a much more meaningful eval than action MSE and
+        let us actually test the "dynamically feasible" claim from our intro. Other natural extensions include
+        hierarchical diffusion (coarse waypoints first, then fine-grained actions, mirroring how humans plan
+        navigation), multi-modal conditioning with language goals or top-down maps, and connecting more directly to the
+        world models literature, since action-diffusion vs video-diffusion is really a question of planning in action
+        space vs observation space.
       </div>
       <div class="margin-right-block"></div>
     </div>
@@ -691,14 +874,11 @@
           <a id="ref_8"></a>[8] <a href="https://arxiv.org/abs/2312.14132">Dust3R</a>, FIX<br /><br />
 
           <!-- include a buffer for easy citation merging -->
-          <a id="ref_9"></a>[10]
-          <a href="https://arxiv.org/pdf/2302.00111">cnn idm</a>, FIX<br /><br />
+          <a id="ref_9"></a>[10] <a href="https://arxiv.org/pdf/2302.00111">cnn idm</a>, FIX<br /><br />
 
-          <a id="ref_10"></a>[11]
-          <a href="https://dinov2.metademolab.com/">dino</a>, FIX<br /><br />
+          <a id="ref_10"></a>[11] <a href="https://dinov2.metademolab.com/">dino</a>, FIX<br /><br />
 
-          <a id="ref_11"></a>[12]
-          <a href="https://arxiv.org/pdf/2211.10408">croco</a>, FIX<br /><br />
+          <a id="ref_11"></a>[12] <a href="https://arxiv.org/pdf/2211.10408">croco</a>, FIX<br /><br />
         </div>
       </div>
       <div class="margin-right-block">
