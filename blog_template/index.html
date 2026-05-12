@@ -427,8 +427,9 @@
         gap: 14px; flex-wrap: wrap; align-items: stretch;
       }
       .content-margin-container > .main-content-block[style*="gap"] img {
-        flex: 1 1 200px; border: 1px solid var(--rule-soft); border-radius: 3px; object-fit: cover;
-      }
+  flex: 1 1 0; min-width: 0; border: 1px solid var(--rule-soft); border-radius: 3px; object-fit: cover;
+}
+
 
       /* ---- references ---- */
       div.citation {
@@ -544,9 +545,9 @@
         </nav>
       </div>
       <div class="main-content-block" style="display: flex; gap: 10px">
-        <img src="./images/top1.jpg" width="256px" />
-        <img src="./images/top2.jpg" width="256px" />
-        <img src="./images/top3.jpg" width="256px" />
+        <img src="./images/top1.jpg" />
+        <img src="./images/top2.jpg" />
+        <img src="./images/top3.jpg" />
       </div>
       <div class="margin-right-block">
         Various frames from the RealEstate10K dataset, showing the beginnings of the house tour clips.
@@ -560,15 +561,15 @@
         Humans navigate the world from an ego-centric view; we can make every decision and plan we need from the visual stimulus of our eyes alone. For computers, this kind of ego-centric navigation planning is much harder, and many modern action planning results sidestep the problem by relying on top-down or external views
         <a href="#ref_1">[1]</a> <a href="#ref_2">[2]</a>. In this work, we investigate whether we can instead generate action sequences to a goal position given only start and finish images from a first-person viewpoint.<br /><br />
         Concretely, we train conditional action-diffusion models on the RealEstate10K dataset <a href="#ref_3">[3]</a>,
-        a collection of egocentric house tour clips. Given the (embeddings of) start and goal images from a clip, each model predicts fixed trajectory length action sequences at a 4 Hz frequency (for 2, 4, or 8 seconds). 
+        a collection of egocentric house tour clips. Under two settings, open and closed conditionings, each model predicts fixed trajectory length action sequences at a 4 Hz frequency (for 2, 4, or 8 seconds). In the open conditioning setting, each model is given the (embeddings of) the start frame for a clip, and is tasked with generating the rest of the trajectory. In the closed conditioning setting, each model is given both the start and end frame for a clip, and is tasked with interpolating the trajectory. 
         We compare this model
         with a baseline built on a diffusion forcing transformer <a href="#ref_4">[4]</a>
      The question we ask is:
         <i>can a action-only diffusion model outperform a video-diffusion model for a navigation task?</i><br /><br />
 
-        Both models lean on the diffusion paradigm to sample from the distribution of possible paths between the start and goal frames, which is the right framing because there is never a single correct action sequence from point A to point B. The interesting question is what each model is forced to learn along the way. By directly generating actions, we hypothesize that the action-diffusion model can decouple motion dynamics from image synthesis, producing trajectories that are more consistent and physically executable. The video diffusion model, on the other hand, has to commit to a full visual rollout, which leaves room for trajectories that look plausible frame-to-frame but are dynamically infeasible when you try to extract the underlying motion.<br /><br />
+        Both models lean on the diffusion paradigm to sample from the distribution of possible paths between the start and goal frames as there can be multiple correct action sequences from point A to point B. The interesting question is what each model is forced to learn along the way. By directly generating actions, we hypothesize that the action-diffusion model can decouple motion dynamics from image synthesis, producing trajectories that are more consistent and physically executable. The video diffusion model, on the other hand, has to commit to a full visual rollout, which leaves room for trajectories that look plausible frame-to-frame but are dynamically infeasible when you try to extract the underlying motion.<br /><br />
         This project targets a specific gap in the literature. Diffusion Policy
-        <a href="#ref_1">[1]</a> iteratively diffuses action chunks inside a closed control loop, and existing inverse dynamics models can recover action deltas between consecutive frames. Neither directly addresses our question: how to interpolate a full action sequence given only a ground truth start and end image.
+        <a href="#ref_1">[1]</a> iteratively diffuses action chunks inside a closed control loop, and existing inverse dynamics models can recover action deltas between consecutive frames, but both of these approaches rely on temporal supervision and feedback. We consider a new question: how to interpolate a full action sequence given only a ground truth start and end image.
 
       </div>
       <div class="margin-right-block">
@@ -588,7 +589,7 @@
       <div class="main-content-block">
         <h1>Background and Related Work</h1>
         <br />
-        <b>Diffusion Models.</b> Introduced in results like <a href="ref_5">[5]</a>, a denoising diffusion model
+        <b>Diffusion Models.</b> Introduced in results like <a href="#ref_5">[5]</a>, a denoising diffusion model
         iteratively denoises a sample from Gaussian noise to generate samples from the data distribution
         <math display="inline"
           ><mrow
@@ -738,10 +739,10 @@
         A core issue in robotics is the lack of scalable and diverse action data. Inverse dynamics models provide a
         solution, by acting as a bridge between video data and action sequences. Because raw image observations are
         high-dimensional, and may encode a lot of information that is irrelevant for action inference, a common approach
-        is to use a pre-trained visual encoder as a backbone for the inverse dynamics model (CITE). Visual encoders such
+        is to use a pre-trained visual encoder as a backbone for the inverse dynamics model <a href="#ref_1">[1]</a>. Visual encoders such
         as DINO and CroCo learn feature representations from images and videos using self-supervised learning, and have
-        shown success in many downstream computer vision tasks (CITE DINO). In particular, CroCo is trained using a
-        <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model reconstructs masked regions of one view using information from the second view of the scene. Because the masked regions can usually be recovered by reasoning about scene geometry and the relative camera pose, the pretraining objective forces the encoder to learn features that capture spatial relationships between the views rather than just semantics. Pretraining on millions of real-world image pairs (on indoor and outdoor scenes) makes CroCo features well-suited as a backbone for downstream geometric tasks.
+        shown success in many downstream computer vision tasks <a href="#ref_1">[1]</a>. In particular, CroCo is trained using a
+        <b>Cro</b>ss-view <b>Co</b>mpletion objective, where the model reconstructs masked regions of one view using information from the second view of the scene <a href="#ref_11">[11]</a>. Because the masked regions can usually be recovered by reasoning about scene geometry and the relative camera pose, the pretraining objective forces the encoder to learn features that capture spatial relationships between the views rather than just semantics. Pretraining on millions of real-world image pairs (on indoor and outdoor scenes) makes CroCo features well-suited as a backbone for downstream geometric tasks.
 
         <br />
         <br />
@@ -755,7 +756,7 @@
       <div class="margin-left-block"></div>
       <div class="main-content-block">
         <h1>Methods</h1>
-        <p><b>Action Representations</b></p><p>
+        <p><b>Action Representations.</b>
         For action representation, we converted consecutive camera poses into relative special euclidean group, SE(3)
         motions.
 
@@ -813,26 +814,25 @@
 
         </p>
 <p>
-        <b>Inverse Dynamics Models</b></p>
-<p>
+        <b>Inverse Dynamics Models.</b>
         We trained both an MLP and a Transformer head on the CrocoV2 features. CrocoV2 is
         specifically suited for downstream pose estimation tasks like Dust3R <a href="#ref_8">[8]</a>, making it a
         reasonable choice for a pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2
-        embedding <a href="#ref_11">[11]</a> and also a pure CNN from pixel-space like in <a href="#ref_10">[10]</a>,
+        embedding <a href="#ref_12">[12]</a> and also a pure CNN from pixel-space like in <a href="#ref_9">[9]</a>,
         but the DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM
         was impractical due to compute limitations.
 
         </p>
 <p>
-	Our global action frequency is set at 4 Hz, so thus the IDM must take two consecutive frame embeddings that occur 0.25s apart and return the inferred action. We compute the ground truth action delta <math display="inline"><msub><mi>a</mi><mi>i</mi></msub></math> using the method from above and then predict the inferred action <math display="inline"><mrow><mover><mi>a</mi><mo>^</mo></mover><mo>=</mo><mi>f</mi><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo stretchy="false">)</mo></mrow></math> using Smooth-L1 loss. To reduce magnitude bias, each action is normalized per dimension to have zero mean and standard deviation of 1 and then denormalized after the forward pass. We use an Adam optimizer with a learning rate of <math display="inline"><msup><mn>10</mn><mrow><mo>−</mo><mn>4</mn></mrow></msup></math> and linear warmup over 1000 steps. The batch size is 64 and we train for 200 epochs.
+	Our global action frequency is set at 4 Hz, so thus the IDM must take two consecutive frame embeddings that occur 0.25s apart and return the inferred action. We compute the ground truth action delta <math display="inline"><msub><mi>a</mi><mi>i</mi></msub></math> using the method from above and then predict the inferred action <math display="inline"><mrow><mover><mi>a</mi><mo>^</mo></mover><mo>=</mo><mi>f</mi><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo stretchy="false">)</mo></mrow></math> using Smooth-L1 loss. To reduce magnitude bias, each action is normalized per dimension then denormalized after the forward pass. We use an Adam optimizer with a learning rate of <math display="inline"><msup><mn>10</mn><mrow><mo>−</mo><mn>4</mn></mrow></msup></math> and linear warmup over 1000 steps. The batch size is 64 and we train for 200 epochs.
 </p>
 <p>
 The CrocoV2 embeddings in the training set are of size <math display="inline"><mrow><mo stretchy="false">[</mo><mi>N</mi><mo>,</mo><mn>196</mn><mo>,</mo><mn>768</mn><mo stretchy="false">]</mo></mrow></math> where <math display="inline"><mrow><mi>N</mi><mo>≈</mo><mn>50000</mn></mrow></math> is the number of image embedding pairs, so to process these we introduce two IDM heads. The first takes a mean pool of the train set to collapse it to size <math display="inline"><mrow><mo stretchy="false">[</mo><mi>N</mi><mo>,</mo><mn>768</mn><mo stretchy="false">]</mo></mrow></math>. Then, <math display="inline"><mrow><msub><mi>f</mi><mrow><mi>m</mi><mi>l</mi><mi>p</mi></mrow></msub><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo stretchy="false">)</mo><mo>=</mo><mi>g</mi><mo stretchy="false">(</mo><msub><mi>z</mi><mi>i</mi></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>−</mo><msub><mi>z</mi><mi>i</mi></msub><mo stretchy="false">)</mo></mrow></math> where <math display="inline"><mi>g</mi></math> is a neural network of two linear layers with dropout, layernorm, and a GELU activation function. The second head performs self-attention over <math display="inline"><mrow><mo stretchy="false">(</mo><mi>C</mi><mi>L</mi><mi>S</mi><mo>,</mo><msub><mi>z</mi><mi>i</mi></msub><mo>,</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo stretchy="false">)</mo></mrow></math>, where <math display="inline"><mrow><mi>C</mi><mi>L</mi><mi>S</mi></mrow></math> is a learnable token. Learnable 1D positional embeddings (one per patch, shared across the two images) and a learnable image-identity embedding (one vector per image) are added. Four pre-norm Transformer encoder blocks (<math display="inline"><mrow><mi>d</mi><mo>=</mo><mn>768</mn></mrow></math>, n_heads=12, mlp_ratio=4) run over the resulting length<math display="inline"><mrow><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mn>2</mn><mi>N</mi><mo>=</mo><mn>393</mn><mo>,</mo><mn>768</mn><mo stretchy="false">)</mo></mrow></math> sequence. Two linear heads from the final CLS embedding produce <math display="inline"><mrow><mover><mi>a</mi><mo>^</mo></mover><mo>∈</mo><msup><mi>ℝ</mi><mn>6</mn></msup></mrow></math>.
 		</p>
-              
-        <b>Baseline Models (DFOT + IDM)</b>
-<p>
-        (tab this somehow) For our video-based baseline, we used a Diffusion Forcing Transformer (DFoT), with actions
+              <p>
+        <b>Baseline Models (DFOT + IDM).</b>
+
+     	For our video-based baseline, we used a Diffusion Forcing Transformer (DFoT), with actions
         derived with our CroCo inverse dynamics model. We used pretrained DFoT models from the authors, which were
         trained on the same RealEstate10K dataset. DFoT allows us to generate interpolated videos between a start and end frame as well as open-ended videos solely given a start frame. After generating the video frames, we run the IDM to generate the inferred actions. </p>
 <b>Action Diffusion Model</b>
@@ -897,7 +897,7 @@ Figure 1: Overview of the action-conditioned diffusion model architecture. The M
     <mo>)</mo>
   </math>.
   We use a simple DDPM here with CFG for conditioning, a sinusoidal time embedding,
-  and two separate head architectures, much like the IDM.
+  and two separate head architectures, much like the IDM. Importantly, on sampling, the model clips the intermediate <math display="inline"><mi>x</mi></math> values so they do not rise to extreme values if the score function falls off the manifold.
 </p>
 
 
@@ -940,23 +940,25 @@ Figure 1: Overview of the action-conditioned diffusion model architecture. The M
   times.
 </p>
 <p>
-There were a few design choices of particular importance here. First, 
+
 </p>
 
-    </div>
+    </div><div class="margin-right-block"></div>
     </div>
 
     <div class="content-margin-container" id="results">
       <div class="margin-left-block"></div>
       <div class="main-content-block">
 <h1> Experiments and Results</h1>
-  <b>Experimental Setup</b>
+  <b>Experimental Setup.</b>
 We evaluated both a baseline video generation pipeline and our proposed action diffusion framework on 2, 4, and 8 second video trajectories, each at 4 frames-per-seconds (fps) and corresponding to 8, 16, and 32 frames respectively. We evaluate both standard and interpolated video generation settings. In the standard setting, both the DFoT video diffusion model and our custom action diffusion model were conditioned on only the initial frame. In the interpolated setting, both models were conditioned on the first and last frames of a trajectory and tasked with generating intermediate frames. 
 <br />
-All experiments use the Real-Estate-10K-Mini split from DFoT. For each test clip we take the first window of the requested length, condition on the ground-truth embeddings of its endpoint frames, and (since the action sampler is stochastic) average over eight sampled action sequences per setting. Longer windows need longer clips, so the usable test set shrinks with horizon: about 250, 142, and 54 clips at 2, 4, and 8&nbsp;s. We report <i>action MSE</i> (per-element error of the predicted 6D twists against ground truth) and, after integrating the predicted twists into one start-to-finish SE(3) transform, the <i>rotation error</i> (residual angle, degrees) and <i>translation error</i> (residual L2, meters) of the final pose. For the action model we also sweep the guidance scale <math display="inline"><mi>w</mi></math> over {0, 1, 2} and the clamp on the predicted clean sample <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math> over {1, 3, 5, 8}. Action MSE is a convenient training-time proxy but a weak measure of trajectory quality; we treat the integrated pose errors as the metrics that matter, and even those are kinematic, not a test of executability.
+All experiments use the Real-Estate-10K-Mini split from DFoT. For each test clip we take the first window of the requested length, condition on the ground-truth embeddings of its endpoint frames, and (since the action sampler is stochastic) average over eight sampled action sequences per setting. We report <i>action MSE</i> (per-element error of the predicted 6D twists against ground truth) and, after integrating the predicted twists into one start-to-finish SE(3) transform, the <i>rotation error</i> (residual angle, degrees) and <i>translation error</i> (residual L2, meters) of the final pose. For the action model we also sweep the guidance scale <math display="inline"><mi>w</mi></math> over {0, 1, 2} and the clamp on the predicted clean sample <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math> over {1, 3, 5, 8}. 
 
 <br /><br />
-<b>Sampler settings.</b> Across the sweep (Figure&nbsp;2), a tight <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math>-clamp is best: loosening it from 1 toward 8 monotonically worsens every metric in every setting. At 2 and 4&nbsp;s the cost is mild; at 8&nbsp;s it is a cliff for the MLP head (action MSE roughly 0.0037 to 0.037, rotation past 90&deg;), while the Transformer is barely affected, so the clamp was masking an MLP failure at long horizons rather than helping uniformly. Guidance gives a small, pose-only improvement, largest in the start+end setting; <math display="inline"><mrow><mi>w</mi><mo>=</mo><mn>2</mn></mrow></math> is occasionally a touch worse than <math display="inline"><mrow><mi>w</mi><mo>=</mo><mn>1</mn></mrow></math>. The clamp is essentially the dynamic-thresholding trick from Imagen applied to the predicted clean action chunk, and a low-dimensional, tightly-concentrated distribution like house-tour twists is unusually sensitive to it: one bad score estimate can fling the prediction off the data manifold and later steps cannot pull it back, which is the MLP failure above. We pin the sampler at <math display="inline"><mrow><mi>w</mi><mo>=</mo><mn>1</mn></mrow></math>, <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math>-clip <math display="inline"><mo>=</mo></math> 1 for the comparisons below.
+<b>Sampler settings.</b> Across the sweep (Figure&nbsp;2), a tight <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math>-clamp is best: loosening it from 1 toward 8 monotonically worsens every metric in every setting. Tight clamping prevents the denoising process from falling off the data manifold and producing extreme values; the true actions seem to have a thin ridge where the diffusion model produces an accurate distribution. Similarly, lower guidance values help the models as too much guidance can push the action generation towards the mode of the data, hurting its MSE. RealEstate10K has a narrow distribution of actions, forcing us to take measures to prevent the diffusion model from producing too extreme generated values. The MLP head especially drops off in performance with longer horizons, showing how it fails to scale with longer action sequences. The transformer’s attention mechanisms allow it to retain cross-sequence relationships with respect to the conditioning, scaling it better with longer horizons.
+
+We thus pin the sampler at <math display="inline"><mrow><mi>w</mi><mo>=</mo><mn>1</mn></mrow></math>, <math display="inline"><msup><mi>x</mi><mn>0</mn></msup></math>-clip <math display="inline"><mo>=</mo></math> 1 for the comparisons below.
 
 <div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
 <img src="./images/charts/sweep_action_mse.png" width="1024px" />
@@ -968,7 +970,7 @@ Figure 2: Effect of the sampling clamp <math display="inline"><msup><mi>x</mi><m
 </div>
 
 <br />
-<b>MLP vs Transformer head.</b> At 2&nbsp;s the two heads are interchangeable (about 0.0019 action MSE, 12&deg; rotation). The Transformer pulls ahead at 4&nbsp;s (about 0.0022 vs 0.0026 MSE, 23&deg; vs 26&deg;) and clearly wins at 8&nbsp;s, both on error and on robustness to a detuned sampler. The per-component MSE (Figure&nbsp;3) shows almost all error sits in forward translation <math display="inline"><msub><mi>v</mi><mi>z</mi></msub></math> (5 to 10x any other component), with pitch <math display="inline"><msub><mi>&omega;</mi><mi>x</mi></msub></math> and roll <math display="inline"><msub><mi>&omega;</mi><mi>z</mi></msub></math> essentially zero because house-tour footage is almost all pan <math display="inline"><msub><mi>&omega;</mi><mi>y</mi></msub></math>; those near-zero components are low-variance, not well-predicted, which is another reason to read action MSE cautiously. The Transformer's gain at 8&nbsp;s is concentrated in the dominant <math display="inline"><msub><mi>v</mi><mi>z</mi></msub></math> term. Cross-attention to the image patches evidently scales to a 32-step action sequence better than mean-pooling and concatenating.
+<b>Where does the error lie?</b> The per-component MSE (Figure&nbsp;3) shows almost all error sits in forward translation <math display="inline"><msub><mi>v</mi><mi>z</mi></msub></math>, the direction of the most variance and thus the one that may differ the most from the ground truth action. Pitch <math display="inline"><msub><mi>&omega;</mi><mi>x</mi></msub></math> and roll <math display="inline"><msub><mi>&omega;</mi><mi>z</mi></msub></math> essentially zero because house-tour footage is almost all pan <math display="inline"><msub><mi>&omega;</mi><mi>y</mi></msub></math>; those near-zero components are low-variance and the model can pin them near zero. 
 
 <div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
 <img src="./images/charts/per_dim_mse.png" width="1024px" />
@@ -978,13 +980,12 @@ Figure 3: Per-component action MSE at the chosen sampling setting (<math display
 </div>
 
 <br />
-<b>Conditioning on the goal frame.</b> The effect is small and inconsistent. At 2&nbsp;s start+end conditioning helps (MLP head: 0.0018 vs 0.0021 MSE, 11.7&deg; vs 12.9&deg; rotation); at 4&nbsp;s it helps the MLP head but slightly hurts the Transformer; at 8&nbsp;s (only ~54 clips) start-only is in fact marginally ahead on rotation, by about 2&deg;, while MSE and translation are a wash. So the goal frame never makes a decisive difference and at the longest horizon looks essentially ignored, which is itself a limit of the start-and-goal framing.
+<b>Conditioning on the goal frame.</b> The effect is small and inconsistent. The goal frame never makes a decisive difference and at the longest horizon looks essentially ignored, which is itself a limit of the start-and-goal framing. Future work could involve enforcing more weight on the end goal condition.
+
 
 <br /><br />
-<b>Horizon scaling.</b> Rotation error roughly doubles per doubling of horizon (about 12&deg;, 24&deg;, 46&deg;), and translation error grows slightly faster than linear (about 0.63, 1.4, 3.5&nbsp;m), consistent with drift compounding. The 8&nbsp;s numbers ride on only ~54 clips, so small inversions there are within noise.
+<b>Action diffusion vs the video-diffusion baseline.</b> As seen in Figure 4, across all trajectory lengths, the DFoT + CroCo-IDM baseline still produced more accurate trajectories than our action diffusion models, by roughly 2× on pose error with consistently lower action MSE. While these results suggest that frame-conditioned inverse dynamics pipelines remain highly effective for navigation planning, the comparison is preliminary since the DFoT baseline used large pretrained checkpoints whereas our action diffusion models were trained from scratch under a limited compute budget.
 
-<br /><br />
-<b>Action diffusion vs the video-diffusion baseline.</b> As measured here the DFoT-plus-CroCo-IDM baseline gives more accurate integrated trajectories at every horizon, by roughly 2x on pose error (rotation about 6&deg; vs 12&deg; at 2&nbsp;s, 13&deg; vs 23-26&deg; at 4&nbsp;s, 22&deg; vs 44-48&deg; at 8&nbsp;s; translation similar, e.g. about 1.8 vs 3.5&nbsp;m at 8&nbsp;s; Figures&nbsp;4 and&nbsp;5), and also lower per-step action MSE (about 0.001 vs 0.0019). The gap is far wider than the per-seed sampler spread on the action side (about 3% of the mean at 2&nbsp;s, 5% at 8&nbsp;s, e.g. 46.1 &plusmn; 2.3&deg; rotation), so it is not a sampling artifact. Two caveats do keep it from being a clean "video diffusion wins": the DFoT models are the authors' checkpoints pretrained on the full RealEstate10K dataset, whereas our action model is trained from scratch on the Mini split under a tight compute budget, so this pits a small action model against a large pretrained video model rather than comparing the two paradigms head to head; and the open-horizon and interpolated baselines come out numerically identical at 4 and 8&nbsp;s, which suggests the baseline actions may have been recovered from ground-truth frames rather than generated ones, in which case the baseline behaves more like an IDM oracle than a real video pipeline. Taken at face value the result supports the "frame-conditioned IDMs are stronger than we credited" reading below, but we treat it as preliminary pending a recheck of the baseline pipeline. Within the baseline, IDM head choice barely matters (the two heads stay within about a degree of each other). <!-- AUTHORS: confirm the baseline IDM actions were produced by running the IDM on DFoT-generated frames, not on ground-truth frames; the text above assumes generated frames. Also note the interp/MLP point at 2 s (8f) looks anomalous (action MSE ~0.0027, rotation ~7.8 deg, large v_y term) and may be a degenerate run worth re-running before this figure is final. -->
 
 <div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
 <img src="./images/charts/compare_rot_err.png" width="1024px" />
@@ -995,18 +996,22 @@ Figure 4: Action diffusion heads vs the inverse-dynamics baseline heads, per tas
 </p>
 </div>
 
-<div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
-<img src="./images/charts/rot_err_bars.png" width="1024px" />
-<p style="text-align: center; margin: 0;">
-Figure 5: Final rotation error vs trajectory length, summarizing Figure&nbsp;4. Left: open conditioning (action model sees only the start frame) vs the standard-video IDM baseline. Right: closed conditioning (action model sees both endpoints) vs the interpolated-video IDM baseline. Grouped bars give the two action-diffusion heads and the two IDM heads at 2, 4, and 8&nbsp;s. The supervised IDM baseline stays well below the action model throughout.
-</p>
+<b>What can the diffusion models help with?</b>
+
+
+<div class="main-content-block" style="display: flex; flex-direction: column; align-items: center; gap: 10px”>
+    <img src="./images/2d_0.png" style="width: 300px; height: auto;" />
+    <img src="./images/2d_1.png" style="width: 300px; height: auto;" />
+    <img src="./images/2d_2.png" style="width: 300px; height: auto;" />
+   <p style="text-align: center; margin: 0;">
+    Figure 5: Visualizing the action trajectories in a 2D space shows that the diffusion model overshoots the ground truth and has high variance across samples while the video baseline sticks closer to the ground truth action.
+  </p>
 </div>
 
-<br />
-<b>What the numbers do and don't tell us.</b> Action MSE and pose error can come apart: in the 8&nbsp;s MLP clamp sweep, MSE moves 10x while rotation moves 2x, and because MSE is almost entirely the <math display="inline"><msub><mi>v</mi><mi>z</mi></msub></math> term a model can look great on MSE while missing the dimension that decides which room it reached. Even our pose errors compare a single integrated transform, not closed-loop executability; that, the small long-horizon test sets, and the baseline's dependence on DFoT's frame quality are the main caveats, which we discuss next.
+It seems that the diffusion model does perform more poorly than the video diffusion model when we try to recreate the ground truth. However, as seen in Figure 5, they embody different patterns. The baseline generates an action that is more similar to the ground truth, as shown in the above results. The diffusion model, in contrast, generates actions that are too large and highly variant. According to our metrics, the diffusion model performs much more poorly. However, if the goal is to rollout multiple possible and feasible trajectories, the diffusion model could show more promise, as seen in <a href=”#ref_1”>[1]</a>. This is a possible avenue for further inquiry.
 
         <h1 id="implications">Implications and limitations</h1>
-        <b>Implications:</b> On this data the action-only model did not win: the DFoT-plus-IDM baseline produced more accurate trajectories at every horizon. We are cautious about reading too much into that, because the comparison is not clean (DFoT is a large model pretrained on the full dataset; our action model is small, trained from scratch on the Mini split, and compute-limited, and the baseline numbers may even reflect an IDM run on ground-truth rather than generated frames). But two things hold up regardless. First, frame-conditioned inverse-dynamics models are stronger than we gave them credit for, and since video diffusion is improving faster than action-specific generative models, riding that curve through a good IDM may be a more scalable path than building bespoke action models. Second, the failure pattern of the action model is informative on its own: error compounds with horizon, the goal frame is effectively ignored at the longest horizons, and the sampler is fragile off-manifold. That pattern is consistent with start-and-goal conditioning being too sparse a signal compared with the dense intermediate-frame scaffolding the IDM gets from DFoT, which points toward hybrid approaches that use video diffusion for a few visual anchors and condition action diffusion on those rather than on endpoints alone. The original hypothesis, that directly modeling the action distribution decouples motion dynamics from image synthesis and dodges the dynamically-infeasible-rollout failure mode, is not refuted here, but our experiments do not support it either; testing it properly needs the apples-to-apples training run and the executability-based evaluation we describe below.
+        <b>Implications:</b> On this data the action-only model did not win: the DFoT-plus-IDM baseline produced more accurate trajectories at every horizon. We are cautious about reading too much into that, because the comparison is not clean (DFoT is a large model pretrained on the full dataset; our action model is small, trained from scratch on the Mini split, and compute-limited). But three things hold up regardless. First, frame-conditioned inverse-dynamics models are stronger than we gave them credit for, and since video diffusion is improving faster than action-specific generative models, riding that curve through a good IDM may be a more scalable path than building bespoke action models. Second, the failure pattern of the action model is informative on its own: error compounds with horizon, the goal frame is effectively ignored at the longest horizons, and the sampler is fragile off-manifold. That pattern is consistent with start-and-goal conditioning being too sparse a signal compared with the dense intermediate-frame scaffolding the IDM gets from DFoT, which points toward hybrid approaches that use video diffusion for a few visual anchors and condition action diffusion on those rather than on endpoints alone. Third, the diffusion model does embody higher variance, potentially showing promise for modeling multimodal or more wide distributions of navigation sequences. The original hypothesis, that directly modeling the action distribution decouples motion dynamics from image synthesis and dodges the dynamically-infeasible-rollout failure mode, is not refuted here, but our experiments do not support it either; testing it properly needs the apples-to-apples training run and the executability-based evaluation we describe below.
 
         <br><br>
                <b>Limitations.</b> A few caveats on what we found. First, our evaluation metrics are imperfect proxies. Action MSE doesn't capture whether the generated trajectory is actually executable; a simulator rollout that executes the predicted twists and measures final pose error would be more meaningful. Second, we never do closed-loop testing: we predict trajectories one-shot and never execute and replan, but real navigation isn't like that. Third, RealEstate10K is camera tours, not robot navigation, so the action distribution reflects what a human videographer films rather than what a robot policy would produce. Finally, IDM quality bounds our baseline. The DFoT pipeline depends on the IDM being good enough to recover actions from generated frames, so if the IDM is the bottleneck, we're not really comparing action diffusion to video diffusion. We're comparing it to the IDM's ceiling.
@@ -1025,21 +1030,35 @@ Beyond compute, the most interesting direction is moving to simulation: train on
         <div class="citation" id="references" style="height: auto">
           <br />
           <span style="font-size: 16px">References:</span><br /><br />
-          <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Diffusion policy</a>, FIX<br /><br />
-          <a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">ACT</a>, FIX<br /><br />
-          <a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">R10K</a>, FIX<br /><br />
-          <a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">Diffusion forcing transformers</a>, FIX<br /><br />
-          <a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2502.06764">Diffusion models</a>, FIX<br /><br />
-          <a id="ref_6"></a>[6] <a href="https://arxiv.org/pdf/2207.12598">CFG</a>, FIX<br /><br />
-          <a id="ref_7"></a>[7] <a href="https://arxiv.org/abs/2407.01392">Diffusion forcing</a>, FIX<br /><br />
-          <a id="ref_8"></a>[8] <a href="https://arxiv.org/abs/2312.14132">Dust3R</a>, FIX<br /><br />
+          <a id="ref_1"></a>[1] <a href="https://diffusion-policy.cs.columbia.edu/">Chi et al., "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion", RSS 2023</a><br /><br />
 
-          <!-- include a buffer for easy citation merging -->
-          <a id="ref_9"></a>[10] <a href="https://arxiv.org/pdf/2302.00111">cnn idm</a>, FIX<br /><br />
+<a id="ref_2"></a>[2] <a href="https://arxiv.org/pdf/2304.13705">Zhao et al., "Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware" (ACT), RSS 2023</a><br /><br />
 
-          <a id="ref_10"></a>[11] <a href="https://dinov2.metademolab.com/">dino</a>, FIX<br /><br />
+<a id="ref_3"></a>[3] <a href="https://google.github.io/realestate10k/index.html">Zhou et al., "Stereo Magnification: Learning View Synthesis Using Multiplane Images" (RealEstate10K), SIGGRAPH 2018</a><br /><br />
 
-          <a id="ref_11"></a>[12] <a href="https://arxiv.org/pdf/2211.10408">croco</a>, FIX<br /><br />
+<a id="ref_4"></a>[4] <a href="https://arxiv.org/abs/2502.06764">Song et al., "History-Guided Video Diffusion" (DFoT), ICML 2025</a><br /><br />
+
+
+<a id="ref_5"></a>[5] <a href="https://arxiv.org/abs/2006.11239">Ho et al., "Denoising Diffusion Probabilistic Models", NeurIPS 2020</a><br /><br />
+
+
+
+<a id="ref_6"></a>[6] <a href="https://arxiv.org/pdf/2207.12598">Ho and Salimans, "Classifier-Free Diffusion Guidance", NeurIPS Workshop 2021</a><br /><br />
+
+<a id="ref_7"></a>[7] <a href="https://arxiv.org/abs/2407.01392">Chen et al., "Diffusion Forcing: Next-Token Prediction Meets Full-Sequence Diffusion", NeurIPS 2024</a><br /><br />
+
+<a id="ref_8"></a>[8] <a href="https://arxiv.org/abs/2312.14132">Wang et al., "DUSt3R: Geometric 3D Vision Made Easy", CVPR 2024</a><br /><br />
+
+<a id="ref_9"></a>[9] <a href="https://arxiv.org/pdf/2302.00111">Du et al., "Learning Universal Policies via Text-Guided Video Generation" (UniPi), NeurIPS 2023</a><br /><br />
+
+<a id="ref_10"></a>[10]
+<a href="https://arxiv.org/abs/2104.14294">
+Caron et al., "Emerging Properties in Self-Supervised Vision Transformers", ICCV 2021 (DINO)
+</a><br /><br />
+
+<a id="ref_11"></a>[11] <a href="https://arxiv.org/pdf/2211.10408">Weinzaepfel et al., "CroCo v2: Improved Cross-View Completion Pre-Training for Stereo Matching and Optical Flow", ICCV 2023</a><br /><br />
+<a id="ref_12"></a>[12] <a href="https://arxiv.org/abs/2104.14294">Caron et al., "Emerging Properties in Self-Supervised Vision Transformers" (DINO), ICCV 2021</a><br /><br />
+
         </div>
       </div>
       <div class="margin-right-block">
