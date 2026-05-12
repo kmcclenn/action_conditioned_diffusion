@@ -818,7 +818,7 @@
         We trained both an MLP and a Transformer head on the CrocoV2 features. CrocoV2 is
         specifically suited for downstream pose estimation tasks like Dust3R <a href="#ref_8">[8]</a>, making it a
         reasonable choice for a pre-training task for an inverse dynamics model. We tried to train the IDM with a DINOv2
-        embedding <a href="#ref_12">[12]</a> and also a pure CNN from pixel-space like in <a href="#ref_9">[9]</a>,
+        embedding <a href="#ref_12">[10]</a> and also a pure CNN from pixel-space like in <a href="#ref_9">[9]</a>,
         but the DINOv2's invariance to translations filtered out any pose-relevant information and the pixel-space IDM
         was impractical due to compute limitations.
 
@@ -1057,7 +1057,6 @@ Caron et al., "Emerging Properties in Self-Supervised Vision Transformers", ICCV
 </a><br /><br />
 
 <a id="ref_11"></a>[11] <a href="https://arxiv.org/pdf/2211.10408">Weinzaepfel et al., "CroCo v2: Improved Cross-View Completion Pre-Training for Stereo Matching and Optical Flow", ICCV 2023</a><br /><br />
-<a id="ref_12"></a>[12] <a href="https://arxiv.org/abs/2104.14294">Caron et al., "Emerging Properties in Self-Supervised Vision Transformers" (DINO), ICCV 2021</a><br /><br />
 
         </div>
       </div>
